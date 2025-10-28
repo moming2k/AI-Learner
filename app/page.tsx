@@ -10,19 +10,19 @@ import QuestionInput from '@/components/QuestionInput';
 import Sidebar from '@/components/Sidebar';
 import Toast, { ToastMessage } from '@/components/Toast';
 import Library from '@/components/Library';
-import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon, FolderOpen, Share2, Download, Upload } from 'lucide-react';
+import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon } from 'lucide-react';
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState<WikiPageType | null>(null);
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [allPages, setAllPages] = useState<WikiPageType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPages, setLoadingPages] = useState<Set<string>>(new Set());
-  const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set()); // Track topics being generated
+  const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
 
-  // Toast helper functions
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = Date.now().toString();
     setToasts(prev => [...prev, { ...toast, id }]);
@@ -37,10 +37,8 @@ export default function Home() {
     setToasts(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   };
 
-  // Helper function to remove consecutive duplicates from breadcrumbs
   const deduplicateBreadcrumbs = (breadcrumbs: Array<{ id: string; title: string }>) => {
     if (!breadcrumbs || breadcrumbs.length === 0) return [];
-
     const deduplicated = [breadcrumbs[0]];
     for (let i = 1; i < breadcrumbs.length; i++) {
       if (breadcrumbs[i].id !== breadcrumbs[i - 1].id) {
@@ -51,42 +49,44 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Clean up duplicate pages on mount (from previous hover bug)
-    const duplicatesRemoved = storage.removeDuplicatePages();
-    if (duplicatesRemoved > 0) {
-      addToast({
-        title: 'Cleanup Complete',
-        message: `Removed ${duplicatesRemoved} duplicate page${duplicatesRemoved > 1 ? 's' : ''}`,
-        type: 'success',
-        duration: 5000
-      });
-    }
-
-    // Load session and bookmarks on mount
-    const savedSession = storage.getCurrentSession();
-    const savedBookmarks = storage.getBookmarks();
-
-    if (savedSession) {
-      // Clean up any existing duplicates in breadcrumbs
-      const cleanedSession = {
-        ...savedSession,
-        breadcrumbs: deduplicateBreadcrumbs(savedSession.breadcrumbs)
-      };
-
-      // Save the cleaned session if duplicates were removed
-      if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length) {
-        storage.saveSession(cleanedSession);
+    const loadInitialData = async () => {
+      const duplicatesRemoved = await storage.removeDuplicatePages();
+      if (duplicatesRemoved > 0) {
+        addToast({
+          title: 'Cleanup Complete',
+          message: `Removed ${duplicatesRemoved} duplicate page${duplicatesRemoved > 1 ? 's' : ''}`,
+          type: 'success',
+          duration: 5000
+        });
       }
 
-      setSession(cleanedSession);
-      const page = storage.getPage(cleanedSession.currentPageId);
-      if (page) setCurrentPage(page);
-    }
+      const savedSession = await storage.getCurrentSession();
+      const savedBookmarks = await storage.getBookmarks();
+      const pages = await storage.getPages();
 
-    setBookmarks(savedBookmarks);
+      if (savedSession) {
+        const cleanedSession = {
+          ...savedSession,
+          breadcrumbs: deduplicateBreadcrumbs(savedSession.breadcrumbs)
+        };
+
+        if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length) {
+          await storage.saveSession(cleanedSession);
+        }
+
+        setSession(cleanedSession);
+        const page = await storage.getPage(cleanedSession.currentPageId);
+        if (page) setCurrentPage(page);
+      }
+
+      setBookmarks(savedBookmarks);
+      setAllPages(pages);
+    };
+
+    loadInitialData();
   }, []);
 
-  const createNewSession = (firstPageId: string, firstPageTitle: string) => {
+  const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
     const newSession: LearningSession = {
       id: 'session-' + Date.now(),
       name: `Learning: ${firstPageTitle}`,
@@ -96,35 +96,31 @@ export default function Home() {
       breadcrumbs: [{ id: firstPageId, title: firstPageTitle }]
     };
 
-    storage.saveSession(newSession);
+    await storage.saveSession(newSession);
     setSession(newSession);
   };
 
-  const updateSession = (pageId: string, pageTitle: string) => {
+  const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
-      createNewSession(pageId, pageTitle);
+      await createNewSession(pageId, pageTitle);
       return;
     }
 
-    // Don't add to breadcrumbs if it's the same as the current page
     const lastBreadcrumb = session.breadcrumbs[session.breadcrumbs.length - 1];
     const shouldAddBreadcrumb = !lastBreadcrumb || lastBreadcrumb.id !== pageId;
 
-    // Build new breadcrumbs and deduplicate
     const newBreadcrumbs = shouldAddBreadcrumb
       ? [...session.breadcrumbs, { id: pageId, title: pageTitle }]
       : session.breadcrumbs;
 
     const updatedSession = {
       ...session,
-      pages: session.pages.includes(pageId)
-        ? session.pages
-        : [...session.pages, pageId],
+      pages: session.pages.includes(pageId) ? session.pages : [...session.pages, pageId],
       currentPageId: pageId,
-      breadcrumbs: deduplicateBreadcrumbs(newBreadcrumbs).slice(-10) // Deduplicate and keep last 10 items
+      breadcrumbs: deduplicateBreadcrumbs(newBreadcrumbs).slice(-10)
     };
 
-    storage.saveSession(updatedSession);
+    await storage.saveSession(updatedSession);
     setSession(updatedSession);
   };
 
@@ -136,20 +132,16 @@ export default function Home() {
     const normalizedTopic = topic.toLowerCase().trim();
     const forceRegenerate = options?.forceRegenerate ?? false;
 
-    const existingPages = storage.searchPages(topic);
-    const exactMatch = existingPages.find(
-      p => p.title.toLowerCase() === normalizedTopic
-    );
+    const existingPages = await storage.searchPages(topic);
+    const exactMatch = existingPages.find(p => p.title.toLowerCase() === normalizedTopic);
 
-    const shouldNavigateExisting =
-      !!exactMatch && !forceRegenerate && !exactMatch.isPlaceholder;
-    const shouldReuseExistingId =
-      !!exactMatch && (forceRegenerate || exactMatch.isPlaceholder);
+    const shouldNavigateExisting = !!exactMatch && !forceRegenerate && !exactMatch.isPlaceholder;
+    const shouldReuseExistingId = !!exactMatch && (forceRegenerate || exactMatch.isPlaceholder);
 
     if (shouldNavigateExisting) {
       if (navigateAfter) {
         setCurrentPage(exactMatch);
-        updateSession(exactMatch.id, exactMatch.title);
+        await updateSession(exactMatch.id, exactMatch.title);
         addToast({
           title: 'Page found',
           message: `"${exactMatch.title}" already exists`,
@@ -205,10 +197,13 @@ export default function Home() {
         topic,
         existingPageId: shouldReuseExistingId && exactMatch ? exactMatch.id : undefined
       });
-      storage.savePage(page);
+      await storage.savePage(page);
 
       const node = generateMindmapNode(page);
-      storage.saveMindmapNode(node);
+      await storage.saveMindmapNode(node);
+
+      const updatedPages = await storage.getPages();
+      setAllPages(updatedPages);
 
       updateToast(toastId, {
         title: `"${topic}" is ready!`,
@@ -219,7 +214,7 @@ export default function Home() {
 
       if (navigateAfter) {
         setCurrentPage(page);
-        updateSession(page.id, page.title);
+        await updateSession(page.id, page.title);
       }
 
       return page;
@@ -262,7 +257,6 @@ export default function Home() {
 
   const handleRegenerateCurrentPage = async () => {
     if (!currentPage) return;
-
     await handleTopicSearch(currentPage.title, true, { forceRegenerate: true });
   };
 
@@ -271,33 +265,34 @@ export default function Home() {
 
     setIsLoading(true);
     try {
-      // Check if similar page exists
-      const existingPages = storage.searchPages(question);
+      const existingPages = await storage.searchPages(question);
       const similarPage = existingPages.find(
         p => p.title.toLowerCase().includes(question.toLowerCase().slice(0, 20))
       );
 
       if (similarPage) {
         setCurrentPage(similarPage);
-        updateSession(similarPage.id, similarPage.title);
+        await updateSession(similarPage.id, similarPage.title);
         return;
       }
 
-      // Generate answer as new page
       const answerPage = await answerQuestion(question, currentPage);
-      storage.savePage(answerPage);
+      await storage.savePage(answerPage);
 
-      // Update mindmap
-      const parentNode = storage.getMindmap().find(n => n.id === currentPage.id);
+      const mindmap = await storage.getMindmap();
+      const parentNode = mindmap.find(n => n.id === currentPage.id);
       const node = generateMindmapNode(answerPage, parentNode);
       if (parentNode) {
         parentNode.children.push(node.id);
-        storage.saveMindmapNode(parentNode);
+        await storage.saveMindmapNode(parentNode);
       }
-      storage.saveMindmapNode(node);
+      await storage.saveMindmapNode(node);
+
+      const updatedPages = await storage.getPages();
+      setAllPages(updatedPages);
 
       setCurrentPage(answerPage);
-      updateSession(answerPage.id, answerPage.title);
+      await updateSession(answerPage.id, answerPage.title);
     } catch (error) {
       console.error('Error asking question:', error);
     } finally {
@@ -305,13 +300,13 @@ export default function Home() {
     }
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
     if (!currentPage) return;
 
     const isBookmarked = bookmarks.some(b => b.pageId === currentPage.id);
 
     if (isBookmarked) {
-      storage.removeBookmark(currentPage.id);
+      await storage.removeBookmark(currentPage.id);
       setBookmarks(bookmarks.filter(b => b.pageId !== currentPage.id));
     } else {
       const newBookmark: Bookmark = {
@@ -319,29 +314,46 @@ export default function Home() {
         title: currentPage.title,
         timestamp: Date.now()
       };
-      storage.addBookmark(newBookmark);
+      await storage.addBookmark(newBookmark);
       setBookmarks([...bookmarks, newBookmark]);
     }
   };
 
-  const handleNavigateToPage = (pageId: string) => {
-    const page = storage.getPage(pageId);
+  const handleNavigateToPage = async (pageId: string) => {
+    const page = await storage.getPage(pageId);
     if (page) {
       setCurrentPage(page);
-      updateSession(page.id, page.title);
+
+      // Check if this page is in the current breadcrumbs
+      if (session) {
+        const breadcrumbIndex = session.breadcrumbs.findIndex(b => b.id === pageId);
+
+        if (breadcrumbIndex >= 0) {
+          // Trim breadcrumbs to this point (going back in history)
+          const updatedSession = {
+            ...session,
+            currentPageId: pageId,
+            breadcrumbs: session.breadcrumbs.slice(0, breadcrumbIndex + 1)
+          };
+          await storage.saveSession(updatedSession);
+          setSession(updatedSession);
+        } else {
+          // Not in breadcrumbs, add it normally
+          await updateSession(page.id, page.title);
+        }
+      } else {
+        // No session, create one
+        await updateSession(page.id, page.title);
+      }
     }
   };
 
-  const isBookmarked = currentPage
-    ? bookmarks.some(b => b.pageId === currentPage.id)
-    : false;
+  const isBookmarked = currentPage ? bookmarks.some(b => b.pageId === currentPage.id) : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <div className="flex">
-        {/* Main Content */}
         <main className="flex-1 min-h-screen">
-          {/* Header */}
           <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-30 shadow-sm">
             <div className="max-w-7xl mx-auto px-6 py-4">
               <div className="flex items-center justify-between">
@@ -362,16 +374,13 @@ export default function Home() {
                     <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
                       <Sparkles className="w-4 h-4 text-indigo-600" />
                       <span className="text-sm font-medium text-gray-700">
-                        {storage.getPages().length} pages in library
+                        {allPages.length} pages in library
                       </span>
                     </div>
                   )}
                   {currentPage && (
                     <button
-                      onClick={() => {
-                        setCurrentPage(null);
-                        // Optionally save current session as a collection
-                      }}
+                      onClick={() => setCurrentPage(null)}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg
                                bg-gradient-to-r from-gray-500 to-gray-600
                                text-white font-medium hover:from-gray-600 hover:to-gray-700
@@ -397,7 +406,6 @@ export default function Home() {
             </div>
           </header>
 
-          {/* Content Area */}
           <div className="max-w-7xl mx-auto px-6 py-8">
             {!currentPage ? (
               <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-8">
@@ -409,10 +417,7 @@ export default function Home() {
                     Enter any topic to generate a comprehensive wiki page powered by AI
                   </p>
                 </div>
-                <TopicSearch
-                  onSearch={async (topic) => { await handleTopicSearch(topic); }}
-                  isLoading={isLoading}
-                />
+                <TopicSearch onSearch={handleTopicSearch} isLoading={isLoading} />
               </div>
             ) : (
               <>
@@ -421,7 +426,7 @@ export default function Home() {
                   page={currentPage}
                   isBookmarked={isBookmarked}
                   onBookmark={handleBookmark}
-                  onNavigate={(topic) => { void handleTopicSearch(topic); }}
+                  onNavigate={handleTopicSearch}
                   onRegenerate={handleRegenerateCurrentPage}
                   isLoading={isLoading}
                 />
@@ -430,7 +435,6 @@ export default function Home() {
           </div>
         </main>
 
-        {/* Sidebar */}
         {currentPage && (
           <Sidebar
             currentPage={currentPage}
@@ -438,34 +442,33 @@ export default function Home() {
             session={session}
             onNavigate={handleNavigateToPage}
             onBookmarkClick={handleNavigateToPage}
-            onSearch={async (query) => { await handleTopicSearch(query, true); }}
+            onSearch={handleTopicSearch}
             loadingPages={loadingPages}
           />
         )}
       </div>
 
-      {/* Library Modal */}
       {showLibrary && (
         <Library
-          pages={storage.getPages()}
-          onPageClick={(pageId) => {
-            const page = storage.getPage(pageId);
+          pages={allPages}
+          onPageClick={async (pageId) => {
+            const page = await storage.getPage(pageId);
             if (page) {
               setCurrentPage(page);
-              updateSession(page.id, page.title);
+              await updateSession(page.id, page.title);
               setShowLibrary(false);
             }
           }}
           currentPageId={currentPage?.id}
           onClose={() => setShowLibrary(false)}
-          onCleanup={() => {
-            // Refresh the page after cleanup
-            window.location.reload();
+          onCleanup={async () => {
+            const pages = await storage.getPages();
+            setAllPages(pages);
+            setShowLibrary(false);
           }}
         />
       )}
 
-      {/* Toast Notifications */}
       <Toast toasts={toasts} onRemove={removeToast} />
     </div>
   );

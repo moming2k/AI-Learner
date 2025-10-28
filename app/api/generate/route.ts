@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       model,
       messages,
       response_format: { type: 'json_object' },
-      max_completion_tokens: 2000,
+      max_completion_tokens: 16000,
     };
 
     if (!model.startsWith('gpt-5')) {

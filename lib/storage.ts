@@ -2,195 +2,226 @@
 
 import { WikiPage, LearningSession, Bookmark, KnowledgeNode } from './types';
 
-const STORAGE_KEYS = {
-  PAGES: 'wiki_pages',
-  SESSIONS: 'learning_sessions',
-  BOOKMARKS: 'bookmarks',
-  MINDMAP: 'knowledge_mindmap',
-  CURRENT_SESSION: 'current_session',
-};
-
 export const storage = {
   // Wiki Pages
-  getPages: (): WikiPage[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.PAGES);
-    return data ? JSON.parse(data) : [];
-  },
-
-  savePage: (page: WikiPage) => {
-    const pages = storage.getPages();
-    const existingIndex = pages.findIndex(p => p.id === page.id);
-
-    if (existingIndex >= 0) {
-      pages[existingIndex] = page;
-    } else {
-      pages.push(page);
+  getPages: async (): Promise<WikiPage[]> => {
+    try {
+      const response = await fetch('/api/pages');
+      if (!response.ok) throw new Error('Failed to fetch pages');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching pages:', error);
+      return [];
     }
-
-    localStorage.setItem(STORAGE_KEYS.PAGES, JSON.stringify(pages));
   },
 
-  getPage: (id: string): WikiPage | null => {
-    const pages = storage.getPages();
-    return pages.find(p => p.id === id) || null;
+  savePage: async (page: WikiPage): Promise<void> => {
+    try {
+      const response = await fetch('/api/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(page)
+      });
+      if (!response.ok) throw new Error('Failed to save page');
+    } catch (error) {
+      console.error('Error saving page:', error);
+      throw error;
+    }
   },
 
-  searchPages: (query: string): WikiPage[] => {
-    const pages = storage.getPages();
-    const lowerQuery = query.toLowerCase();
-    return pages.filter(p =>
-      p.title.toLowerCase().includes(lowerQuery) ||
-      p.content.toLowerCase().includes(lowerQuery)
-    );
+  getPage: async (id: string): Promise<WikiPage | null> => {
+    try {
+      const response = await fetch(`/api/pages?id=${id}`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Failed to fetch page');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching page:', error);
+      return null;
+    }
+  },
+
+  searchPages: async (query: string): Promise<WikiPage[]> => {
+    try {
+      const response = await fetch(`/api/pages?query=${encodeURIComponent(query)}`);
+      if (!response.ok) throw new Error('Failed to search pages');
+      return await response.json();
+    } catch (error) {
+      console.error('Error searching pages:', error);
+      return [];
+    }
   },
 
   // Learning Sessions
-  getSessions: (): LearningSession[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveSession: (session: LearningSession) => {
-    const sessions = storage.getSessions();
-    const existingIndex = sessions.findIndex(s => s.id === session.id);
-
-    if (existingIndex >= 0) {
-      sessions[existingIndex] = session;
-    } else {
-      sessions.push(session);
+  getSessions: async (): Promise<LearningSession[]> => {
+    try {
+      const response = await fetch('/api/sessions');
+      if (!response.ok) throw new Error('Failed to fetch sessions');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      return [];
     }
-
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-    localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, session.id);
   },
 
-  getCurrentSession: (): LearningSession | null => {
-    const sessionId = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
-    if (!sessionId) return null;
+  saveSession: async (session: LearningSession): Promise<void> => {
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(session)
+      });
+      if (!response.ok) throw new Error('Failed to save session');
+    } catch (error) {
+      console.error('Error saving session:', error);
+      throw error;
+    }
+  },
 
-    const sessions = storage.getSessions();
-    return sessions.find(s => s.id === sessionId) || null;
+  getCurrentSession: async (): Promise<LearningSession | null> => {
+    try {
+      const response = await fetch('/api/sessions?current=true');
+      if (!response.ok) throw new Error('Failed to fetch current session');
+      const data = await response.json();
+      return data.session || null;
+    } catch (error) {
+      console.error('Error fetching current session:', error);
+      return null;
+    }
   },
 
   // Bookmarks
-  getBookmarks: (): Bookmark[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
-    return data ? JSON.parse(data) : [];
-  },
-
-  addBookmark: (bookmark: Bookmark) => {
-    const bookmarks = storage.getBookmarks();
-    if (!bookmarks.find(b => b.pageId === bookmark.pageId)) {
-      bookmarks.push(bookmark);
-      localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify(bookmarks));
+  getBookmarks: async (): Promise<Bookmark[]> => {
+    try {
+      const response = await fetch('/api/bookmarks');
+      if (!response.ok) throw new Error('Failed to fetch bookmarks');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching bookmarks:', error);
+      return [];
     }
   },
 
-  removeBookmark: (pageId: string) => {
-    const bookmarks = storage.getBookmarks();
-    const filtered = bookmarks.filter(b => b.pageId !== pageId);
-    localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify(filtered));
+  addBookmark: async (bookmark: Bookmark): Promise<void> => {
+    try {
+      const response = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookmark)
+      });
+      if (!response.ok) throw new Error('Failed to add bookmark');
+    } catch (error) {
+      console.error('Error adding bookmark:', error);
+      throw error;
+    }
+  },
+
+  removeBookmark: async (pageId: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/bookmarks?pageId=${pageId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to remove bookmark');
+    } catch (error) {
+      console.error('Error removing bookmark:', error);
+      throw error;
+    }
   },
 
   // Mindmap
-  getMindmap: (): KnowledgeNode[] => {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.MINDMAP);
-    return data ? JSON.parse(data) : [];
+  getMindmap: async (): Promise<KnowledgeNode[]> => {
+    try {
+      const response = await fetch('/api/mindmap');
+      if (!response.ok) throw new Error('Failed to fetch mindmap');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching mindmap:', error);
+      return [];
+    }
   },
 
-  saveMindmapNode: (node: KnowledgeNode) => {
-    const nodes = storage.getMindmap();
-    const existingIndex = nodes.findIndex(n => n.id === node.id);
-
-    if (existingIndex >= 0) {
-      nodes[existingIndex] = node;
-    } else {
-      nodes.push(node);
+  saveMindmapNode: async (node: KnowledgeNode): Promise<void> => {
+    try {
+      const response = await fetch('/api/mindmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(node)
+      });
+      if (!response.ok) throw new Error('Failed to save mindmap node');
+    } catch (error) {
+      console.error('Error saving mindmap node:', error);
+      throw error;
     }
-
-    localStorage.setItem(STORAGE_KEYS.MINDMAP, JSON.stringify(nodes));
   },
 
   // Remove duplicate pages based on title
-  removeDuplicatePages: (): number => {
-    const pages = storage.getPages();
-    const uniquePages = new Map<string, WikiPage>();
-    const titleCounts = new Map<string, number>();
-
-    // Count occurrences and keep the most recent one
-    pages.forEach(page => {
-      const normalizedTitle = page.title.toLowerCase().trim();
-      const existingPage = uniquePages.get(normalizedTitle);
-
-      // Track count for reporting
-      titleCounts.set(normalizedTitle, (titleCounts.get(normalizedTitle) || 0) + 1);
-
-      // Keep the most recent page (higher timestamp)
-      if (!existingPage || page.createdAt > existingPage.createdAt) {
-        uniquePages.set(normalizedTitle, page);
-      }
-    });
-
-    // Calculate how many duplicates were removed
-    const duplicatesRemoved = pages.length - uniquePages.size;
-
-    if (duplicatesRemoved > 0) {
-      // Save the unique pages
-      const uniquePagesArray = Array.from(uniquePages.values());
-      localStorage.setItem(STORAGE_KEYS.PAGES, JSON.stringify(uniquePagesArray));
-
-      console.log(`Removed ${duplicatesRemoved} duplicate pages`);
-
-      // Log which titles had duplicates
-      titleCounts.forEach((count, title) => {
-        if (count > 1) {
-          console.log(`  - "${title}": had ${count} copies, kept 1`);
-        }
+  removeDuplicatePages: async (): Promise<number> => {
+    try {
+      const response = await fetch('/api/pages?action=duplicates', {
+        method: 'DELETE'
       });
+      if (!response.ok) throw new Error('Failed to remove duplicates');
+      const data = await response.json();
+      return data.removed || 0;
+    } catch (error) {
+      console.error('Error removing duplicates:', error);
+      return 0;
     }
-
-    return duplicatesRemoved;
   },
 
   // Get duplicate pages info without removing
-  getDuplicateInfo: () => {
-    const pages = storage.getPages();
-    const titleMap = new Map<string, WikiPage[]>();
+  getDuplicateInfo: async () => {
+    try {
+      const pages = await storage.getPages();
+      const titleMap = new Map<string, WikiPage[]>();
 
-    pages.forEach(page => {
-      const normalizedTitle = page.title.toLowerCase().trim();
-      const existing = titleMap.get(normalizedTitle) || [];
-      existing.push(page);
-      titleMap.set(normalizedTitle, existing);
-    });
+      pages.forEach(page => {
+        const normalizedTitle = page.title.toLowerCase().trim();
+        const existing = titleMap.get(normalizedTitle) || [];
+        existing.push(page);
+        titleMap.set(normalizedTitle, existing);
+      });
 
-    const duplicates: Array<{ title: string; count: number; pages: WikiPage[] }> = [];
+      const duplicates: Array<{ title: string; count: number; pages: WikiPage[] }> = [];
 
-    titleMap.forEach((pages, title) => {
-      if (pages.length > 1) {
-        duplicates.push({
-          title: pages[0].title, // Use original title
-          count: pages.length,
-          pages: pages.sort((a, b) => b.createdAt - a.createdAt) // Sort by newest first
-        });
-      }
-    });
+      titleMap.forEach((pages, title) => {
+        if (pages.length > 1) {
+          duplicates.push({
+            title: pages[0].title,
+            count: pages.length,
+            pages: pages.sort((a, b) => b.createdAt - a.createdAt)
+          });
+        }
+      });
 
-    return {
-      totalPages: pages.length,
-      uniquePages: titleMap.size,
-      duplicatesFound: pages.length - titleMap.size,
-      duplicateGroups: duplicates
-    };
+      return {
+        totalPages: pages.length,
+        uniquePages: titleMap.size,
+        duplicatesFound: pages.length - titleMap.size,
+        duplicateGroups: duplicates
+      };
+    } catch (error) {
+      console.error('Error getting duplicate info:', error);
+      return {
+        totalPages: 0,
+        uniquePages: 0,
+        duplicatesFound: 0,
+        duplicateGroups: []
+      };
+    }
   },
 
-  clearAll: () => {
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
+  clearAll: async (): Promise<void> => {
+    try {
+      await Promise.all([
+        fetch('/api/pages?action=all', { method: 'DELETE' }),
+        fetch('/api/sessions', { method: 'DELETE' }),
+        fetch('/api/bookmarks?all=true', { method: 'DELETE' }),
+        fetch('/api/mindmap', { method: 'DELETE' })
+      ]);
+    } catch (error) {
+      console.error('Error clearing all data:', error);
+      throw error;
+    }
   },
 };

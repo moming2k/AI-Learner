@@ -7,8 +7,8 @@ import ReactMarkdown from 'react-markdown';
 interface WikiPageProps {
   page: WikiPageType;
   isBookmarked: boolean;
-  onBookmark: () => void;
-  onNavigate: (topic: string) => void | Promise<void>;
+  onBookmark: () => void | Promise<void>;
+  onNavigate: (topic: string) => void | Promise<void | unknown>;
   onBackgroundGenerate?: (topic: string) => void;
   onRegenerate?: () => void | Promise<void>;
   isLoading?: boolean;

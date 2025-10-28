@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 
 interface TopicSearchProps {
-  onSearch: (topic: string) => void | Promise<void>;
+  onSearch: (topic: string) => void | Promise<void | unknown>;
   isLoading?: boolean;
 }
 

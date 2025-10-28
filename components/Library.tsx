@@ -22,11 +22,14 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
 
   // Check for duplicates on mount
   useEffect(() => {
-    const info = storage.getDuplicateInfo();
-    if (info.duplicatesFound > 0) {
-      setDuplicateInfo(info);
-      setShowDuplicateWarning(true);
-    }
+    const checkDuplicates = async () => {
+      const info = await storage.getDuplicateInfo();
+      if (info.duplicatesFound > 0) {
+        setDuplicateInfo(info);
+        setShowDuplicateWarning(true);
+      }
+    };
+    checkDuplicates();
   }, []);
 
   // Filter and sort pages
@@ -121,8 +124,8 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                 </p>
               </div>
               <button
-                onClick={() => {
-                  const removed = storage.removeDuplicatePages();
+                onClick={async () => {
+                  const removed = await storage.removeDuplicatePages();
                   if (removed > 0 && onCleanup) {
                     onCleanup();
                   }

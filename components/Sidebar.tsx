@@ -8,9 +8,9 @@ interface SidebarProps {
   currentPage: WikiPage | null;
   bookmarks: Bookmark[];
   session: LearningSession | null;
-  onNavigate: (pageId: string) => void;
-  onBookmarkClick: (pageId: string) => void;
-  onSearch: (query: string) => void | Promise<void>;
+  onNavigate: (pageId: string) => void | Promise<void>;
+  onBookmarkClick: (pageId: string) => void | Promise<void>;
+  onSearch: (query: string) => void | Promise<void | unknown>;
   loadingPages?: Set<string>; // Track which pages are being generated
 }
 
