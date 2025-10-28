@@ -47,10 +47,49 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
-    const parsed = JSON.parse(content);
+    const choice = data?.choices?.[0];
+    const content = choice?.message?.content;
 
-    return NextResponse.json(parsed);
+    if (!choice) {
+      console.error('OpenAI response missing choices:', data);
+      return NextResponse.json(
+        { error: 'OpenAI response did not contain any choices.' },
+        { status: 502 }
+      );
+    }
+
+    if (choice.finish_reason === 'length') {
+      console.error('OpenAI response truncated (finish_reason=length):', data);
+      return NextResponse.json(
+        {
+          error:
+            'OpenAI response was truncated by the max token limit. Try reducing the prompt or increasing max_completion_tokens.',
+        },
+        { status: 502 }
+      );
+    }
+
+    if (typeof content !== 'string' || content.trim().length === 0) {
+      console.error('OpenAI response missing content:', data);
+      return NextResponse.json(
+        { error: 'OpenAI response did not return any content.' },
+        { status: 502 }
+      );
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      return NextResponse.json(parsed);
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI JSON response:', parseError, content);
+      return NextResponse.json(
+        {
+          error: 'Failed to parse OpenAI response as JSON. Check the prompt formatting.',
+          raw: content,
+        },
+        { status: 502 }
+      );
+    }
   } catch (error) {
     console.error('Error in generate API:', error);
     return NextResponse.json(

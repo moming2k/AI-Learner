@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Test OpenAI API Configuration
 // Run: node test-openai.js
 
@@ -39,7 +40,7 @@ const testMessage = {
       content: 'Return a JSON object with a single field "status" set to "working".'
     }
   ],
-  max_completion_tokens: 100,
+  max_completion_tokens: 256,
   response_format: { type: 'json_object' }
 };
 
@@ -73,7 +74,35 @@ const req = https.request(options, (res) => {
 
       if (res.statusCode === 200) {
         console.log('✅ OpenAI API is working correctly!');
-        console.log('\nResponse:', response.choices[0].message.content);
+
+        const choice = response?.choices?.[0];
+
+        if (!choice) {
+          console.warn('\n⚠️ Response did not include any choices.');
+        } else {
+          if (choice.finish_reason === 'length') {
+            console.warn(
+              '\n⚠️ The response stopped because the max token limit was reached. Consider increasing max_completion_tokens.'
+            );
+          }
+
+          const content = choice?.message?.content;
+
+          if (typeof content === 'string' && content.trim().length > 0) {
+            try {
+              const parsed = JSON.parse(content);
+              console.log('\nResponse (parsed JSON):', parsed);
+            } catch (parseError) {
+              console.warn('\n⚠️ Response content was not valid JSON.');
+              console.warn('Parse error:', parseError.message);
+              console.warn('Raw content:');
+              console.warn(content);
+            }
+          } else {
+            console.warn('\n⚠️ Response content was empty.');
+          }
+        }
+
         console.log('\n📊 Usage:');
         console.log(`- Prompt tokens: ${response.usage.prompt_tokens}`);
         console.log(`- Completion tokens: ${response.usage.completion_tokens}`);
