@@ -1,18 +1,28 @@
 'use client';
 
 import { WikiPage as WikiPageType } from '@/lib/types';
-import { BookmarkPlus, BookmarkCheck, ExternalLink } from 'lucide-react';
+import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface WikiPageProps {
   page: WikiPageType;
   isBookmarked: boolean;
   onBookmark: () => void;
-  onNavigate: (topic: string) => void;
+  onNavigate: (topic: string) => void | Promise<void>;
   onBackgroundGenerate?: (topic: string) => void;
+  onRegenerate?: () => void | Promise<void>;
+  isLoading?: boolean;
 }
 
-export default function WikiPage({ page, isBookmarked, onBookmark, onNavigate, onBackgroundGenerate }: WikiPageProps) {
+export default function WikiPage({
+  page,
+  isBookmarked,
+  onBookmark,
+  onNavigate,
+  onBackgroundGenerate,
+  onRegenerate,
+  isLoading,
+}: WikiPageProps) {
   return (
     <article className="bg-white rounded-2xl shadow-xl p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -31,6 +41,40 @@ export default function WikiPage({ page, isBookmarked, onBookmark, onNavigate, o
             <BookmarkPlus className="w-6 h-6 text-gray-400" />
           )}
         </button>
+      {page.isPlaceholder && onRegenerate && (
+        <div className="mb-8 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-white p-6 shadow-inner">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-amber-100 p-2 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-amber-900">Generation failed</h2>
+                <p className="text-sm text-amber-700">We couldn't reach the AI service. Update your API key or retry the generation.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { onRegenerate && void onRegenerate(); }}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:from-amber-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Regenerating...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Regenerate page</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       </div>
 
       {/* Content */}
@@ -70,7 +114,7 @@ export default function WikiPage({ page, isBookmarked, onBookmark, onNavigate, o
             {page.relatedTopics.map((topic, idx) => (
               <button
                 key={idx}
-                onClick={() => onNavigate(topic)}
+                onClick={() => { void onNavigate(topic); }}
                 className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50
                          border border-blue-200 text-blue-700 font-medium
                          hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300
@@ -94,7 +138,7 @@ export default function WikiPage({ page, isBookmarked, onBookmark, onNavigate, o
             {page.suggestedQuestions.map((question, idx) => (
               <button
                 key={idx}
-                onClick={() => onNavigate(question)}
+                onClick={() => { void onNavigate(question); }}
                 className="w-full text-left px-4 py-3 rounded-lg bg-white
                          border border-indigo-200 text-gray-700
                          hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50

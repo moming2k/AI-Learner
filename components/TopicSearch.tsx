@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 
 interface TopicSearchProps {
-  onSearch: (topic: string) => void;
+  onSearch: (topic: string) => void | Promise<void>;
   isLoading?: boolean;
 }
 
@@ -14,7 +14,7 @@ export default function TopicSearch({ onSearch, isLoading }: TopicSearchProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
-      onSearch(topic.trim());
+      void onSearch(topic.trim());
     }
   };
 

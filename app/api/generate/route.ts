@@ -15,19 +15,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const model = process.env.OPENAI_MODEL || 'gpt-5';
+
+    const requestPayload: Record<string, unknown> = {
+      model,
+      messages,
+      response_format: { type: 'json_object' },
+      max_completion_tokens: 2000,
+    };
+
+    if (!model.startsWith('gpt-5')) {
+      requestPayload.temperature = 0.7;
+    }
+
     const response = await fetch(`${apiBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5',
-        messages,
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' }
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     if (!response.ok) {

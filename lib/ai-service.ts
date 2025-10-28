@@ -5,10 +5,13 @@ interface GenerateWikiParams {
   context?: string;
   relatedPages?: WikiPage[];
   parentId?: string;
+  existingPageId?: string;
 }
 
 export async function generateWikiPage(params: GenerateWikiParams): Promise<WikiPage> {
-  const { topic, context, relatedPages, parentId } = params;
+  const { topic, context, relatedPages, parentId, existingPageId } = params;
+
+  const resolvedId = existingPageId ?? generateId(topic);
 
   const systemPrompt = `You are an expert educational content creator. Generate comprehensive, well-structured wiki content that is:
 - Accurate and informative
@@ -48,10 +51,11 @@ Format your response as JSON with this structure:
     const data = await response.json();
 
     const page: WikiPage = {
-      id: generateId(topic),
+      id: resolvedId,
       ...data,
       createdAt: Date.now(),
-      parentId
+      parentId,
+      isPlaceholder: false
     };
 
     return page;
@@ -60,13 +64,14 @@ Format your response as JSON with this structure:
 
     // Fallback content
     return {
-      id: generateId(topic),
+      id: resolvedId,
       title: topic,
       content: `# ${topic}\n\nThis is a placeholder page. The AI service is currently unavailable.\n\nPlease configure your OpenAI API key in the .env.local file.`,
       relatedTopics: [],
       suggestedQuestions: [],
       createdAt: Date.now(),
-      parentId
+      parentId,
+      isPlaceholder: true
     };
   }
 }
@@ -110,7 +115,8 @@ Format as JSON:
       id: generateId(question),
       ...data,
       createdAt: Date.now(),
-      parentId: currentPage.id
+      parentId: currentPage.id,
+      isPlaceholder: false
     };
   } catch (error) {
     console.error('Error answering question:', error);
@@ -122,7 +128,8 @@ Format as JSON:
       relatedTopics: [],
       suggestedQuestions: [],
       createdAt: Date.now(),
-      parentId: currentPage.id
+      parentId: currentPage.id,
+      isPlaceholder: true
     };
   }
 }

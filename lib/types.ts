@@ -6,6 +6,7 @@ export interface WikiPage {
   suggestedQuestions: string[];
   createdAt: number;
   parentId?: string;
+  isPlaceholder?: boolean;
   mindmapPosition?: { x: number; y: number };
 }
 

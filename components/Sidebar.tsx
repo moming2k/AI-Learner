@@ -10,7 +10,7 @@ interface SidebarProps {
   session: LearningSession | null;
   onNavigate: (pageId: string) => void;
   onBookmarkClick: (pageId: string) => void;
-  onSearch: (query: string) => void;
+  onSearch: (query: string) => void | Promise<void>;
   loadingPages?: Set<string>; // Track which pages are being generated
 }
 
@@ -29,7 +29,7 @@ export default function Sidebar({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      onSearch(searchQuery.trim());
+      void onSearch(searchQuery.trim());
       setSearchQuery('');
     }
   };
@@ -152,7 +152,7 @@ export default function Sidebar({
                 {currentPage.relatedTopics.map((topic, idx) => (
                   <button
                     key={idx}
-                    onClick={() => onSearch(topic)}
+                    onClick={() => { void onSearch(topic); }}
                     className="w-full text-left px-3 py-2 rounded-lg text-sm
                              bg-gradient-to-r from-gray-50 to-gray-100
                              border border-gray-200

@@ -128,16 +128,25 @@ export default function Home() {
     setSession(updatedSession);
   };
 
-  const handleTopicSearch = async (topic: string, navigateAfter = true) => {
+  const handleTopicSearch = async (
+    topic: string,
+    navigateAfter = true,
+    options?: { forceRegenerate?: boolean }
+  ) => {
     const normalizedTopic = topic.toLowerCase().trim();
+    const forceRegenerate = options?.forceRegenerate ?? false;
 
-    // Check if page already exists
     const existingPages = storage.searchPages(topic);
     const exactMatch = existingPages.find(
       p => p.title.toLowerCase() === normalizedTopic
     );
 
-    if (exactMatch) {
+    const shouldNavigateExisting =
+      !!exactMatch && !forceRegenerate && !exactMatch.isPlaceholder;
+    const shouldReuseExistingId =
+      !!exactMatch && (forceRegenerate || exactMatch.isPlaceholder);
+
+    if (shouldNavigateExisting) {
       if (navigateAfter) {
         setCurrentPage(exactMatch);
         updateSession(exactMatch.id, exactMatch.title);
@@ -151,7 +160,6 @@ export default function Home() {
       return exactMatch;
     }
 
-    // Check if already loading this topic
     if (loadingTopics.has(normalizedTopic)) {
       addToast({
         title: 'Already generating',
@@ -162,27 +170,25 @@ export default function Home() {
       return;
     }
 
-    // Add to loading topics
     setLoadingTopics(prev => new Set(prev).add(normalizedTopic));
 
-    // Generate ID for tracking in sidebar
-    const tempId = `loading-${normalizedTopic}`;
-    setLoadingPages(prev => new Set(prev).add(tempId));
+    const fallbackLoadingId = `loading-${normalizedTopic}`;
+    const loadingId = shouldReuseExistingId && exactMatch ? exactMatch.id : fallbackLoadingId;
+    setLoadingPages(prev => new Set(prev).add(loadingId));
 
-    // Add temporary breadcrumb for loading state
-    if (navigateAfter) {
-      const currentSession = session;
-      if (currentSession) {
-        const tempBreadcrumb = { id: tempId, title: topic };
-        const updatedSession = {
-          ...currentSession,
-          breadcrumbs: [...currentSession.breadcrumbs, tempBreadcrumb].slice(-10)
+    const shouldAddTempBreadcrumb = navigateAfter && !exactMatch;
+
+    if (shouldAddTempBreadcrumb) {
+      setSession(prev => {
+        if (!prev) return prev;
+        const tempBreadcrumb = { id: loadingId, title: topic };
+        return {
+          ...prev,
+          breadcrumbs: [...prev.breadcrumbs, tempBreadcrumb].slice(-10)
         };
-        setSession(updatedSession);
-      }
+      });
     }
 
-    // Show toast notification
     const toastId = addToast({
       title: `Generating "${topic}"...`,
       message: 'Please wait while we create this page',
@@ -195,15 +201,15 @@ export default function Home() {
     }
 
     try {
-      // Generate new page
-      const page = await generateWikiPage({ topic });
+      const page = await generateWikiPage({
+        topic,
+        existingPageId: shouldReuseExistingId && exactMatch ? exactMatch.id : undefined
+      });
       storage.savePage(page);
 
-      // Update mindmap
       const node = generateMindmapNode(page);
       storage.saveMindmapNode(node);
 
-      // Update toast to success
       updateToast(toastId, {
         title: `"${topic}" is ready!`,
         message: 'Page generated successfully',
@@ -213,7 +219,6 @@ export default function Home() {
 
       if (navigateAfter) {
         setCurrentPage(page);
-        // Replace temporary breadcrumb with real one
         updateSession(page.id, page.title);
       }
 
@@ -227,16 +232,19 @@ export default function Home() {
         duration: 5000
       });
 
-      // Remove temporary breadcrumb if it failed
-      if (navigateAfter && session) {
-        const filteredBreadcrumbs = session.breadcrumbs.filter(b => b.id !== tempId);
-        setSession({ ...session, breadcrumbs: filteredBreadcrumbs });
+      if (shouldAddTempBreadcrumb) {
+        setSession(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            breadcrumbs: prev.breadcrumbs.filter(b => b.id !== loadingId)
+          };
+        });
       }
     } finally {
-      // Clean up loading states
       setLoadingPages(prev => {
         const updated = new Set(prev);
-        updated.delete(tempId);
+        updated.delete(loadingId);
         return updated;
       });
 
@@ -250,6 +258,12 @@ export default function Home() {
         setIsLoading(false);
       }
     }
+  };
+
+  const handleRegenerateCurrentPage = async () => {
+    if (!currentPage) return;
+
+    await handleTopicSearch(currentPage.title, true, { forceRegenerate: true });
   };
 
   const handleAskQuestion = async (question: string) => {
@@ -395,7 +409,10 @@ export default function Home() {
                     Enter any topic to generate a comprehensive wiki page powered by AI
                   </p>
                 </div>
-                <TopicSearch onSearch={handleTopicSearch} isLoading={isLoading} />
+                <TopicSearch
+                  onSearch={async (topic) => { await handleTopicSearch(topic); }}
+                  isLoading={isLoading}
+                />
               </div>
             ) : (
               <>
@@ -404,7 +421,9 @@ export default function Home() {
                   page={currentPage}
                   isBookmarked={isBookmarked}
                   onBookmark={handleBookmark}
-                  onNavigate={handleTopicSearch}
+                  onNavigate={(topic) => { void handleTopicSearch(topic); }}
+                  onRegenerate={handleRegenerateCurrentPage}
+                  isLoading={isLoading}
                 />
               </>
             )}
@@ -419,7 +438,7 @@ export default function Home() {
             session={session}
             onNavigate={handleNavigateToPage}
             onBookmarkClick={handleNavigateToPage}
-            onSearch={handleTopicSearch}
+            onSearch={async (query) => { await handleTopicSearch(query, true); }}
             loadingPages={loadingPages}
           />
         )}

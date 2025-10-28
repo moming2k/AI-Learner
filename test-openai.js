@@ -39,10 +39,13 @@ const testMessage = {
       content: 'Return a JSON object with a single field "status" set to "working".'
     }
   ],
-  temperature: 0.7,
-  max_tokens: 100,
+  max_completion_tokens: 100,
   response_format: { type: 'json_object' }
 };
+
+if (!model.startsWith('gpt-5')) {
+  testMessage.temperature = 0.7;
+}
 
 const url = new URL(`${apiBaseUrl}/chat/completions`);
 
