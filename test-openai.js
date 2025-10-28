@@ -8,7 +8,7 @@ require('dotenv').config({ path: '.env.local' });
 
 const apiKey = process.env.OPENAI_API_KEY;
 const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
-const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+const model = process.env.OPENAI_MODEL || 'gpt-5';
 
 console.log('🔧 OpenAI API Test');
 console.log('==================');
