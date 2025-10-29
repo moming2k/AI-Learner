@@ -84,7 +84,7 @@ export default function Sidebar({
                   const isLoading = loadingPages.has(crumb.id);
                   return (
                     <button
-                      key={crumb.id}
+                      key={`${crumb.id}-${idx}`}
                       onClick={() => !isLoading && onNavigate(crumb.id)}
                       disabled={isLoading}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all

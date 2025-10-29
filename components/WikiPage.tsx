@@ -98,8 +98,6 @@ export default function WikiPage({
         </div>
       )}
 
-      </div>
-
       {/* Content - Only show if not generating, always show for errors or real content */}
       {!isGenerating && (
         <div className="prose prose-lg max-w-none mb-8">
