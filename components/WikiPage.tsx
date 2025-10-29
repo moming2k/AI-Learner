@@ -23,6 +23,10 @@ export default function WikiPage({
   onRegenerate,
   isLoading,
 }: WikiPageProps) {
+  // Check if this is a generating placeholder (not an error)
+  const isGenerating = page.isPlaceholder && page.content.includes('Generating content');
+  const isError = page.isPlaceholder && page.content.includes('Generation failed');
+
   return (
     <article className="bg-white rounded-2xl shadow-xl p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -34,6 +38,7 @@ export default function WikiPage({
           onClick={onBookmark}
           className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
           title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+          disabled={page.isPlaceholder}
         >
           {isBookmarked ? (
             <BookmarkCheck className="w-6 h-6 text-blue-600" />
@@ -41,7 +46,25 @@ export default function WikiPage({
             <BookmarkPlus className="w-6 h-6 text-gray-400" />
           )}
         </button>
-      {page.isPlaceholder && onRegenerate && (
+      </div>
+
+      {/* Generating Status */}
+      {isGenerating && (
+        <div className="mb-8 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-6 shadow-inner">
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-blue-900">Generating content...</h2>
+              <p className="text-sm text-blue-700">Please wait while AI creates comprehensive content for this topic. This usually takes a few seconds.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Status */}
+      {isError && onRegenerate && (
         <div className="mb-8 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-white p-6 shadow-inner">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
@@ -77,9 +100,10 @@ export default function WikiPage({
 
       </div>
 
-      {/* Content */}
-      <div className="prose prose-lg max-w-none mb-8">
-        <ReactMarkdown
+      {/* Content - Only show if not generating, always show for errors or real content */}
+      {!isGenerating && (
+        <div className="prose prose-lg max-w-none mb-8">
+          <ReactMarkdown
           components={{
             h1: ({ children }) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
             h2: ({ children }) => <h2 className="text-2xl font-bold mt-6 mb-3 text-gray-800">{children}</h2>,
@@ -104,7 +128,8 @@ export default function WikiPage({
         >
           {page.content}
         </ReactMarkdown>
-      </div>
+        </div>
+      )}
 
       {/* Related Topics */}
       {page.relatedTopics.length > 0 && (

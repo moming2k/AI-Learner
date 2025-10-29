@@ -184,17 +184,34 @@ export default function Home() {
     const loadingId = shouldReuseExistingId && exactMatch ? exactMatch.id : fallbackLoadingId;
     setLoadingPages(prev => new Set(prev).add(loadingId));
 
-    const shouldAddTempBreadcrumb = navigateAfter && !exactMatch;
+    // Create a placeholder page immediately if navigating
+    if (navigateAfter) {
+      const placeholderPage: WikiPageType = {
+        id: loadingId,
+        title: topic,
+        content: '# Generating content...\n\nPlease wait while we create this page for you. This usually takes a few seconds.',
+        relatedTopics: [],
+        suggestedQuestions: [],
+        createdAt: Date.now(),
+        isPlaceholder: true
+      };
 
-    if (shouldAddTempBreadcrumb) {
-      setSession(prev => {
-        if (!prev) return prev;
-        const tempBreadcrumb = { id: loadingId, title: topic };
-        return {
-          ...prev,
-          breadcrumbs: [...prev.breadcrumbs, tempBreadcrumb].slice(-10)
-        };
-      });
+      // Immediately show the placeholder page
+      setCurrentPage(placeholderPage);
+      await updateSession(loadingId, topic);
+    } else {
+      // Legacy: for background generation, still add breadcrumb
+      const shouldAddTempBreadcrumb = navigateAfter && !exactMatch;
+      if (shouldAddTempBreadcrumb) {
+        setSession(prev => {
+          if (!prev) return prev;
+          const tempBreadcrumb = { id: loadingId, title: topic };
+          return {
+            ...prev,
+            breadcrumbs: [...prev.breadcrumbs, tempBreadcrumb].slice(-10)
+          };
+        });
+      }
     }
 
     const toastId = addToast({
@@ -225,6 +242,7 @@ export default function Home() {
       });
 
       if (navigateAfter) {
+        // Update the placeholder page with real content
         setCurrentPage(page);
         await updateSession(page.id, page.title);
       }
@@ -239,7 +257,18 @@ export default function Home() {
         duration: 5000
       });
 
-      if (shouldAddTempBreadcrumb) {
+      // If we're showing a placeholder, update it to show error
+      if (navigateAfter) {
+        setCurrentPage(prev => {
+          if (!prev || prev.id !== loadingId) return prev;
+          return {
+            ...prev,
+            content: '# Generation failed\n\nWe encountered an error while generating this page. Please check your API configuration and try again.',
+            isPlaceholder: true
+          };
+        });
+      } else {
+        // Legacy cleanup for background generation
         setSession(prev => {
           if (!prev) return prev;
           return {
