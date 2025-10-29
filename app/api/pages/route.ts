@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbPages } from '@/lib/db';
+import { getDbPages } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { WikiPage } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbPages = getDbPages(dbName);
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const query = searchParams.get('query');
@@ -31,8 +35,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbPages = getDbPages(dbName);
+
     const page: WikiPage = await request.json();
-    
+
     if (!page.id || !page.title || !page.content) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -50,6 +57,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbPages = getDbPages(dbName);
+
     const searchParams = request.nextUrl.searchParams;
     const action = searchParams.get('action');
 

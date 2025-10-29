@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbBookmarks } from '@/lib/db';
+import { getDbBookmarks } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { Bookmark } from '@/lib/types';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbBookmarks = getDbBookmarks(dbName);
+
     const bookmarks = dbBookmarks.getAll();
     return NextResponse.json(bookmarks);
   } catch (error) {
@@ -14,8 +18,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbBookmarks = getDbBookmarks(dbName);
+
     const bookmark: Bookmark = await request.json();
-    
+
     if (!bookmark.pageId || !bookmark.title) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -33,6 +40,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbBookmarks = getDbBookmarks(dbName);
+
     const searchParams = request.nextUrl.searchParams;
     const pageId = searchParams.get('pageId');
 

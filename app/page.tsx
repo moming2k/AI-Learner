@@ -10,6 +10,7 @@ import QuestionInput from '@/components/QuestionInput';
 import Sidebar from '@/components/Sidebar';
 import Toast, { ToastMessage } from '@/components/Toast';
 import Library from '@/components/Library';
+import DatabaseSelector from '@/components/DatabaseSelector';
 import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon } from 'lucide-react';
 
 export default function Home() {
@@ -48,42 +49,57 @@ export default function Home() {
     return deduplicated;
   };
 
+  const loadAllData = async (showToast: boolean = false) => {
+    const duplicatesRemoved = await storage.removeDuplicatePages();
+    if (duplicatesRemoved > 0 && showToast) {
+      addToast({
+        title: 'Cleanup Complete',
+        message: `Removed ${duplicatesRemoved} duplicate page${duplicatesRemoved > 1 ? 's' : ''}`,
+        type: 'success',
+        duration: 5000
+      });
+    }
+
+    const savedSession = await storage.getCurrentSession();
+    const savedBookmarks = await storage.getBookmarks();
+    const pages = await storage.getPages();
+
+    if (savedSession) {
+      const cleanedSession = {
+        ...savedSession,
+        breadcrumbs: deduplicateBreadcrumbs(savedSession.breadcrumbs)
+      };
+
+      if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length) {
+        await storage.saveSession(cleanedSession);
+      }
+
+      setSession(cleanedSession);
+      const page = await storage.getPage(cleanedSession.currentPageId);
+      if (page) setCurrentPage(page);
+    } else {
+      // Clear state when switching to empty database
+      setSession(null);
+      setCurrentPage(null);
+    }
+
+    setBookmarks(savedBookmarks);
+    setAllPages(pages);
+  };
+
+  const handleDatabaseChange = () => {
+    // Reload all data from the new database
+    loadAllData(false);
+    addToast({
+      title: 'Library switched',
+      message: 'Now viewing the selected library',
+      type: 'success',
+      duration: 3000
+    });
+  };
+
   useEffect(() => {
-    const loadInitialData = async () => {
-      const duplicatesRemoved = await storage.removeDuplicatePages();
-      if (duplicatesRemoved > 0) {
-        addToast({
-          title: 'Cleanup Complete',
-          message: `Removed ${duplicatesRemoved} duplicate page${duplicatesRemoved > 1 ? 's' : ''}`,
-          type: 'success',
-          duration: 5000
-        });
-      }
-
-      const savedSession = await storage.getCurrentSession();
-      const savedBookmarks = await storage.getBookmarks();
-      const pages = await storage.getPages();
-
-      if (savedSession) {
-        const cleanedSession = {
-          ...savedSession,
-          breadcrumbs: deduplicateBreadcrumbs(savedSession.breadcrumbs)
-        };
-
-        if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length) {
-          await storage.saveSession(cleanedSession);
-        }
-
-        setSession(cleanedSession);
-        const page = await storage.getPage(cleanedSession.currentPageId);
-        if (page) setCurrentPage(page);
-      }
-
-      setBookmarks(savedBookmarks);
-      setAllPages(pages);
-    };
-
-    loadInitialData();
+    loadAllData(true);
   }, []);
 
   const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
@@ -188,10 +204,6 @@ export default function Home() {
       duration: 0
     });
 
-    if (navigateAfter) {
-      setIsLoading(true);
-    }
-
     try {
       const page = await generateWikiPage({
         topic,
@@ -248,10 +260,6 @@ export default function Home() {
         updated.delete(normalizedTopic);
         return updated;
       });
-
-      if (navigateAfter) {
-        setIsLoading(false);
-      }
     }
   };
 
@@ -391,6 +399,7 @@ export default function Home() {
                       <span className="hidden sm:inline">Home</span>
                     </button>
                   )}
+                  <DatabaseSelector onDatabaseChange={handleDatabaseChange} />
                   <button
                     onClick={() => setShowLibrary(true)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg

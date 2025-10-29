@@ -2,11 +2,37 @@
 
 import { WikiPage, LearningSession, Bookmark, KnowledgeNode } from './types';
 
+const DB_STORAGE_KEY = 'selectedDatabase';
+const DB_HEADER_NAME = 'x-database-name';
+
+// Get current database name from localStorage
+function getCurrentDatabase(): string {
+  if (typeof window === 'undefined') return 'default';
+  return localStorage.getItem(DB_STORAGE_KEY) || 'default';
+}
+
+// Set current database name in localStorage
+export function setCurrentDatabase(dbName: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(DB_STORAGE_KEY, dbName);
+  }
+}
+
+// Get headers with database name
+function getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
+  return {
+    [DB_HEADER_NAME]: getCurrentDatabase(),
+    ...additionalHeaders
+  };
+}
+
 export const storage = {
   // Wiki Pages
   getPages: async (): Promise<WikiPage[]> => {
     try {
-      const response = await fetch('/api/pages');
+      const response = await fetch('/api/pages', {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch pages');
       return await response.json();
     } catch (error) {
@@ -19,7 +45,7 @@ export const storage = {
     try {
       const response = await fetch('/api/pages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(page)
       });
       if (!response.ok) throw new Error('Failed to save page');
@@ -31,7 +57,9 @@ export const storage = {
 
   getPage: async (id: string): Promise<WikiPage | null> => {
     try {
-      const response = await fetch(`/api/pages?id=${id}`);
+      const response = await fetch(`/api/pages?id=${id}`, {
+        headers: getHeaders()
+      });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('Failed to fetch page');
       return await response.json();
@@ -43,7 +71,9 @@ export const storage = {
 
   searchPages: async (query: string): Promise<WikiPage[]> => {
     try {
-      const response = await fetch(`/api/pages?query=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/pages?query=${encodeURIComponent(query)}`, {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to search pages');
       return await response.json();
     } catch (error) {
@@ -55,7 +85,9 @@ export const storage = {
   // Learning Sessions
   getSessions: async (): Promise<LearningSession[]> => {
     try {
-      const response = await fetch('/api/sessions');
+      const response = await fetch('/api/sessions', {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch sessions');
       return await response.json();
     } catch (error) {
@@ -68,7 +100,7 @@ export const storage = {
     try {
       const response = await fetch('/api/sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(session)
       });
       if (!response.ok) throw new Error('Failed to save session');
@@ -80,7 +112,9 @@ export const storage = {
 
   getCurrentSession: async (): Promise<LearningSession | null> => {
     try {
-      const response = await fetch('/api/sessions?current=true');
+      const response = await fetch('/api/sessions?current=true', {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch current session');
       const data = await response.json();
       return data.session || null;
@@ -93,7 +127,9 @@ export const storage = {
   // Bookmarks
   getBookmarks: async (): Promise<Bookmark[]> => {
     try {
-      const response = await fetch('/api/bookmarks');
+      const response = await fetch('/api/bookmarks', {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch bookmarks');
       return await response.json();
     } catch (error) {
@@ -106,7 +142,7 @@ export const storage = {
     try {
       const response = await fetch('/api/bookmarks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(bookmark)
       });
       if (!response.ok) throw new Error('Failed to add bookmark');
@@ -119,7 +155,8 @@ export const storage = {
   removeBookmark: async (pageId: string): Promise<void> => {
     try {
       const response = await fetch(`/api/bookmarks?pageId=${pageId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getHeaders()
       });
       if (!response.ok) throw new Error('Failed to remove bookmark');
     } catch (error) {
@@ -131,7 +168,9 @@ export const storage = {
   // Mindmap
   getMindmap: async (): Promise<KnowledgeNode[]> => {
     try {
-      const response = await fetch('/api/mindmap');
+      const response = await fetch('/api/mindmap', {
+        headers: getHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch mindmap');
       return await response.json();
     } catch (error) {
@@ -144,7 +183,7 @@ export const storage = {
     try {
       const response = await fetch('/api/mindmap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(node)
       });
       if (!response.ok) throw new Error('Failed to save mindmap node');
@@ -158,7 +197,8 @@ export const storage = {
   removeDuplicatePages: async (): Promise<number> => {
     try {
       const response = await fetch('/api/pages?action=duplicates', {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getHeaders()
       });
       if (!response.ok) throw new Error('Failed to remove duplicates');
       const data = await response.json();
@@ -213,11 +253,12 @@ export const storage = {
 
   clearAll: async (): Promise<void> => {
     try {
+      const headers = getHeaders();
       await Promise.all([
-        fetch('/api/pages?action=all', { method: 'DELETE' }),
-        fetch('/api/sessions', { method: 'DELETE' }),
-        fetch('/api/bookmarks?all=true', { method: 'DELETE' }),
-        fetch('/api/mindmap', { method: 'DELETE' })
+        fetch('/api/pages?action=all', { method: 'DELETE', headers }),
+        fetch('/api/sessions', { method: 'DELETE', headers }),
+        fetch('/api/bookmarks?all=true', { method: 'DELETE', headers }),
+        fetch('/api/mindmap', { method: 'DELETE', headers })
       ]);
     } catch (error) {
       console.error('Error clearing all data:', error);

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbMindmap } from '@/lib/db';
+import { getDbMindmap } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { KnowledgeNode } from '@/lib/types';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbMindmap = getDbMindmap(dbName);
+
     const nodes = dbMindmap.getAll();
     return NextResponse.json(nodes);
   } catch (error) {
@@ -14,8 +18,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbMindmap = getDbMindmap(dbName);
+
     const node: KnowledgeNode = await request.json();
-    
+
     if (!node.id || !node.title || node.depth === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -31,8 +38,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbMindmap = getDbMindmap(dbName);
+
     dbMindmap.deleteAll();
     return NextResponse.json({ success: true });
   } catch (error) {

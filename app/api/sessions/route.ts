@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbSessions } from '@/lib/db';
+import { getDbSessions } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { LearningSession } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbSessions = getDbSessions(dbName);
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const current = searchParams.get('current');
@@ -35,8 +39,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbSessions = getDbSessions(dbName);
+
     const session: LearningSession = await request.json();
-    
+
     if (!session.id || !session.name) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -53,8 +60,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbSessions = getDbSessions(dbName);
+
     dbSessions.deleteAll();
     return NextResponse.json({ success: true });
   } catch (error) {
