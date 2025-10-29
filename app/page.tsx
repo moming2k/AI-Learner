@@ -301,6 +301,34 @@ export default function Home() {
     if (!currentPage) return;
 
     setIsLoading(true);
+
+    // Create a temporary loading ID for this question
+    const loadingId = `loading-${question.toLowerCase().trim()}`;
+    setLoadingPages(prev => new Set(prev).add(loadingId));
+
+    // Create placeholder page immediately
+    const placeholderPage: WikiPageType = {
+      id: loadingId,
+      title: question,
+      content: '# Generating content...\n\nPlease wait while we create this page for you. This usually takes a few seconds.',
+      relatedTopics: [],
+      suggestedQuestions: [],
+      createdAt: Date.now(),
+      isPlaceholder: true,
+      parentId: currentPage.id
+    };
+
+    // Immediately show the placeholder page
+    setCurrentPage(placeholderPage);
+    await updateSession(loadingId, question);
+
+    const toastId = addToast({
+      title: `Generating "${question}"...`,
+      message: 'Please wait while we create this page',
+      type: 'loading',
+      duration: 0
+    });
+
     try {
       const existingPages = await storage.searchPages(question);
       const similarPage = existingPages.find(
@@ -310,6 +338,12 @@ export default function Home() {
       if (similarPage) {
         setCurrentPage(similarPage);
         await updateSession(similarPage.id, similarPage.title);
+        updateToast(toastId, {
+          title: 'Page found',
+          message: `"${similarPage.title}" already exists`,
+          type: 'info',
+          duration: 3000
+        });
         return;
       }
 
@@ -328,12 +362,42 @@ export default function Home() {
       const updatedPages = await storage.getPages();
       setAllPages(updatedPages);
 
+      updateToast(toastId, {
+        title: `"${question}" is ready!`,
+        message: 'Page generated successfully',
+        type: 'success',
+        duration: 5000
+      });
+
+      // Update placeholder with real content
       setCurrentPage(answerPage);
       await updateSession(answerPage.id, answerPage.title);
     } catch (error) {
       console.error('Error asking question:', error);
+
+      updateToast(toastId, {
+        title: 'Failed to generate page',
+        message: 'Please try again',
+        type: 'error',
+        duration: 5000
+      });
+
+      // Update placeholder to show error
+      setCurrentPage(prev => {
+        if (!prev || prev.id !== loadingId) return prev;
+        return {
+          ...prev,
+          content: '# Generation failed\n\nWe encountered an error while generating this page. Please check your API configuration and try again.',
+          isPlaceholder: true
+        };
+      });
     } finally {
       setIsLoading(false);
+      setLoadingPages(prev => {
+        const updated = new Set(prev);
+        updated.delete(loadingId);
+        return updated;
+      });
     }
   };
 
