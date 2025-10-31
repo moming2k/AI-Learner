@@ -29,7 +29,7 @@ function setCache(cacheKey: string, data: any): void {
   generationCache.set(cacheKey, { data, timestamp: Date.now() });
   // Clean up old cache entries (keep max 50 items)
   if (generationCache.size > 50) {
-    const oldestKey = Array.from(generationCache.keys())[0];
+    const oldestKey = generationCache.keys().next().value;
     generationCache.delete(oldestKey);
   }
 }
