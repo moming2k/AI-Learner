@@ -37,6 +37,7 @@ export default function WikiPage({
     context: string;
     position: { x: number; y: number };
   } | null>(null);
+  const [popupWidth, setPopupWidth] = useState<number>(300); // Default width, will be updated dynamically
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Find the context (paragraph or section) containing the selected text
@@ -74,7 +75,7 @@ export default function WikiPage({
           text: selectedText,
           context: context,
           position: {
-            x: rect.left + rect.width / 2 - 150, // Center popup on selection
+            x: rect.left + rect.width / 2 - popupWidth / 2, // Center popup on selection using dynamic width
             y: rect.bottom + 10, // Position below selection
           },
         });
@@ -259,6 +260,7 @@ export default function WikiPage({
           position={selectionData.position}
           onGenerate={handleGenerateFromSelection}
           onClose={handleClosePopup}
+          onWidthCalculated={setPopupWidth}
         />
       )}
     </article>
