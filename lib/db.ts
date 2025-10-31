@@ -125,10 +125,8 @@ export function getDbPages(dbName: string = 'default') {
     removeDuplicates: (): number => {
       const db = getDatabase(dbName);
 
-      // Use transaction for atomicity and better performance
-      db.exec('BEGIN TRANSACTION');
-
-      try {
+      // Use db.transaction() for automatic error handling and ROLLBACK semantics
+      const removeDuplicatesTransaction = db.transaction(() => {
         // Single query using window function to identify and delete duplicates
         // Keeps the most recent page (highest created_at) for each normalized title
         const result = db.prepare(`
@@ -144,14 +142,11 @@ export function getDbPages(dbName: string = 'default') {
           )
         `).run();
 
-        db.exec('COMMIT');
-
         // Return number of deleted rows
         return (result as Database.RunResult).changes || 0;
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
-      }
+      });
+
+      return removeDuplicatesTransaction();
     },
 
     deleteAll: () => {
