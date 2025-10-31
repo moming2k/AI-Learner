@@ -76,6 +76,76 @@ Format your response as JSON with this structure:
   }
 }
 
+export async function generateFromSelection(
+  selectedText: string,
+  context: string,
+  currentPage: WikiPage
+): Promise<WikiPage> {
+  const systemPrompt = `You are an expert educator creating detailed content based on highlighted text. Create a comprehensive wiki page that:
+- Explains the selected term/concept in depth
+- Uses the provided context to understand the specific meaning and usage
+- Provides relevant examples and explanations
+- Connects to related concepts
+- Is tailored to the context of where the text was selected from
+
+Format as JSON:
+{
+  "title": "Clear, descriptive title for the concept",
+  "content": "Comprehensive markdown content explaining the selected text with context-aware details",
+  "relatedTopics": ["Related Topic 1", "Related Topic 2", "Related Topic 3"],
+  "suggestedQuestions": ["Follow-up Question 1?", "Follow-up Question 2?", "Follow-up Question 3?"]
+}`;
+
+  const userPrompt = `Current page: ${currentPage.title}
+
+Selected text: "${selectedText}"
+
+Context from the page where this was selected:
+"${context}"
+
+Create a detailed wiki page about "${selectedText}" that takes into account the specific context and usage shown above. The explanation should be relevant to how this term/concept appears in the context of "${currentPage.title}".`;
+
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate from selection');
+    }
+
+    const data = await response.json();
+
+    return {
+      id: generateId(selectedText),
+      ...data,
+      createdAt: Date.now(),
+      parentId: currentPage.id,
+      isPlaceholder: false
+    };
+  } catch (error) {
+    console.error('Error generating from selection:', error);
+
+    return {
+      id: generateId(selectedText),
+      title: selectedText,
+      content: `# ${selectedText}\n\nUnable to generate content. Please check your API configuration.`,
+      relatedTopics: [],
+      suggestedQuestions: [],
+      createdAt: Date.now(),
+      parentId: currentPage.id,
+      isPlaceholder: true
+    };
+  }
+}
+
 export async function answerQuestion(question: string, currentPage: WikiPage): Promise<WikiPage> {
   const systemPrompt = `You are an expert educator answering a student's question. Create a focused wiki page that:
 - Directly answers the question
