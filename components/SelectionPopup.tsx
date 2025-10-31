@@ -90,7 +90,7 @@ export default function SelectionPopup({
       <div className="flex items-start justify-between mb-3 gap-2">
         <div className="flex-1">
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Selected Text (Editable)
+            Selected Text
           </div>
           <textarea
             value={editableText}
