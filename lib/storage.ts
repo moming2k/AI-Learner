@@ -82,6 +82,19 @@ export const storage = {
     }
   },
 
+  deletePage: async (id: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/pages?id=${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete page');
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      throw error;
+    }
+  },
+
   // Learning Sessions
   getSessions: async (): Promise<LearningSession[]> => {
     try {

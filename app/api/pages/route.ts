@@ -62,6 +62,7 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const action = searchParams.get('action');
+    const id = searchParams.get('id');
 
     if (action === 'duplicates') {
       const removed = dbPages.removeDuplicates();
@@ -73,7 +74,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    if (id) {
+      dbPages.deleteById(id);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Invalid action or missing id' }, { status: 400 });
   } catch (error) {
     console.error('Error in pages DELETE:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -204,15 +204,22 @@ export default function DatabaseSelector({ onDatabaseChange }: DatabaseSelectorP
                   </div>
 
                   {db.name !== 'default' && (
-                    <button
+                    <div
                       onClick={(e) => handleDeleteDatabase(db.name, e)}
-                      disabled={isLoading}
                       className="opacity-0 group-hover:opacity-100 p-2 rounded-lg
-                               hover:bg-red-100 text-red-600 transition-all"
+                               hover:bg-red-100 text-red-600 transition-all cursor-pointer"
                       title="Delete database"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleDeleteDatabase(db.name, e as any);
+                        }
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </div>
                   )}
                 </button>
               ))}

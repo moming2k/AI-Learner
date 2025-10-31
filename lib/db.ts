@@ -151,6 +151,11 @@ export function getDbPages(dbName: string = 'default') {
     deleteAll: () => {
       const db = getDatabase(dbName);
       db.prepare('DELETE FROM wiki_pages').run();
+    },
+
+    deleteById: (id: string) => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM wiki_pages WHERE id = ?').run(id);
     }
   };
 }

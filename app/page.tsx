@@ -65,12 +65,68 @@ export default function Home() {
     const pages = await storage.getPages();
 
     if (savedSession) {
+      // Create a set of valid page IDs in current database
+      const validPageIds = new Set(pages.map(p => p.id));
+
+      // Clean up loading IDs from breadcrumbs by trying to find the real page
+      // AND filter out breadcrumbs that reference pages not in this database
+      const cleanedBreadcrumbs = await Promise.all(
+        savedSession.breadcrumbs.map(async (crumb) => {
+          if (crumb.id.startsWith('loading-')) {
+            // Try to find a page with matching title
+            const matchingPage = pages.find(
+              p => p.title.toLowerCase() === crumb.title.toLowerCase()
+            );
+            if (matchingPage) {
+              return { id: matchingPage.id, title: matchingPage.title };
+            }
+            // If no match found for loading ID, return null to filter it out
+            return null;
+          }
+          // Check if this page ID exists in current database
+          if (!validPageIds.has(crumb.id)) {
+            return null; // Filter out pages from other databases
+          }
+          return crumb;
+        })
+      );
+
+      // Filter out null entries (invalid breadcrumbs)
+      const validBreadcrumbs = cleanedBreadcrumbs.filter(b => b !== null) as Array<{ id: string; title: string }>;
+
       const cleanedSession = {
         ...savedSession,
-        breadcrumbs: deduplicateBreadcrumbs(savedSession.breadcrumbs)
+        breadcrumbs: deduplicateBreadcrumbs(validBreadcrumbs),
+        pages: savedSession.pages.filter(pageId => validPageIds.has(pageId))
       };
 
-      if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length) {
+      // Also fix currentPageId if it's a loading ID or invalid
+      if (cleanedSession.currentPageId.startsWith('loading-')) {
+        const matchingPage = pages.find(
+          p => p.title.toLowerCase() === savedSession.breadcrumbs.find(b => b.id === cleanedSession.currentPageId)?.title.toLowerCase()
+        );
+        if (matchingPage) {
+          cleanedSession.currentPageId = matchingPage.id;
+        }
+      }
+
+      // If currentPageId is not in valid pages, use the last valid breadcrumb or clear
+      if (!validPageIds.has(cleanedSession.currentPageId)) {
+        if (validBreadcrumbs.length > 0) {
+          cleanedSession.currentPageId = validBreadcrumbs[validBreadcrumbs.length - 1].id;
+        } else {
+          // No valid breadcrumbs, clear the session
+          setSession(null);
+          setCurrentPage(null);
+          setBookmarks(savedBookmarks);
+          setAllPages(pages);
+          return;
+        }
+      }
+
+      if (cleanedSession.breadcrumbs.length !== savedSession.breadcrumbs.length ||
+          cleanedSession.currentPageId !== savedSession.currentPageId ||
+          cleanedSession.pages.length !== savedSession.pages.length) {
         await storage.saveSession(cleanedSession);
       }
 
@@ -87,9 +143,18 @@ export default function Home() {
     setAllPages(pages);
   };
 
-  const handleDatabaseChange = () => {
+  const handleDatabaseChange = async () => {
+    // Clear current state to prevent mixing data from different databases
+    setCurrentPage(null);
+    setSession(null);
+    setBookmarks([]);
+    setAllPages([]);
+    setLoadingPages(new Set());
+    setLoadingTopics(new Set());
+
     // Reload all data from the new database
-    loadAllData(false);
+    await loadAllData(false);
+
     addToast({
       title: 'Library switched',
       message: 'Now viewing the selected library',
@@ -123,11 +188,22 @@ export default function Home() {
     }
 
     const lastBreadcrumb = session.breadcrumbs[session.breadcrumbs.length - 1];
-    const shouldAddBreadcrumb = !lastBreadcrumb || lastBreadcrumb.id !== pageId;
 
-    const newBreadcrumbs = shouldAddBreadcrumb
-      ? [...session.breadcrumbs, { id: pageId, title: pageTitle }]
-      : session.breadcrumbs;
+    // Check if the last breadcrumb is a temporary loading placeholder that should be replaced
+    const isReplacingPlaceholder = lastBreadcrumb &&
+                                    lastBreadcrumb.id.startsWith('loading-') &&
+                                    pageId !== lastBreadcrumb.id;
+
+    let newBreadcrumbs;
+    if (isReplacingPlaceholder) {
+      // Replace the last (loading) breadcrumb with the real page
+      newBreadcrumbs = [...session.breadcrumbs.slice(0, -1), { id: pageId, title: pageTitle }];
+    } else {
+      const shouldAddBreadcrumb = !lastBreadcrumb || lastBreadcrumb.id !== pageId;
+      newBreadcrumbs = shouldAddBreadcrumb
+        ? [...session.breadcrumbs, { id: pageId, title: pageTitle }]
+        : session.breadcrumbs;
+    }
 
     const updatedSession = {
       ...session,
@@ -154,6 +230,7 @@ export default function Home() {
     const shouldNavigateExisting = !!exactMatch && !forceRegenerate && !exactMatch.isPlaceholder;
     const shouldReuseExistingId = !!exactMatch && (forceRegenerate || exactMatch.isPlaceholder);
 
+    // If page exists, navigate immediately (only if navigateAfter is true)
     if (shouldNavigateExisting) {
       if (navigateAfter) {
         setCurrentPage(exactMatch);
@@ -166,6 +243,14 @@ export default function Home() {
         });
       }
       return exactMatch;
+    }
+
+    // If page doesn't exist and user clicked a link (not from main page), generate in background (no navigation)
+    // This means: clicking links only navigates if page exists; otherwise generates in background
+    // But if searching from main page (currentPage is null), always navigate after generation
+    if (navigateAfter && !exactMatch && currentPage !== null) {
+      // Override: don't navigate for non-existent pages when clicking links from other pages
+      navigateAfter = false;
     }
 
     if (loadingTopics.has(normalizedTopic)) {
@@ -184,7 +269,7 @@ export default function Home() {
     const loadingId = shouldReuseExistingId && exactMatch ? exactMatch.id : fallbackLoadingId;
     setLoadingPages(prev => new Set(prev).add(loadingId));
 
-    // Create a placeholder page immediately if navigating
+    // Create a placeholder page immediately only if navigating (from TopicSearch on home page)
     if (navigateAfter) {
       const placeholderPage: WikiPageType = {
         id: loadingId,
@@ -199,19 +284,6 @@ export default function Home() {
       // Immediately show the placeholder page
       setCurrentPage(placeholderPage);
       await updateSession(loadingId, topic);
-    } else {
-      // Legacy: for background generation, still add breadcrumb
-      const shouldAddTempBreadcrumb = navigateAfter && !exactMatch;
-      if (shouldAddTempBreadcrumb) {
-        setSession(prev => {
-          if (!prev) return prev;
-          const tempBreadcrumb = { id: loadingId, title: topic };
-          return {
-            ...prev,
-            breadcrumbs: [...prev.breadcrumbs, tempBreadcrumb].slice(-10)
-          };
-        });
-      }
     }
 
     const toastId = addToast({
@@ -265,15 +337,6 @@ export default function Home() {
             ...prev,
             content: '# Generation failed\n\nWe encountered an error while generating this page. Please check your API configuration and try again.',
             isPlaceholder: true
-          };
-        });
-      } else {
-        // Legacy cleanup for background generation
-        setSession(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            breadcrumbs: prev.breadcrumbs.filter(b => b.id !== loadingId)
           };
         });
       }
@@ -566,7 +629,45 @@ export default function Home() {
           onCleanup={async () => {
             const pages = await storage.getPages();
             setAllPages(pages);
-            setShowLibrary(false);
+          }}
+          onDeletePage={async (pageId) => {
+            // Refresh the pages list
+            const pages = await storage.getPages();
+            setAllPages(pages);
+
+            // If the deleted page is the current page, clear it
+            if (currentPage?.id === pageId) {
+              setCurrentPage(null);
+            }
+
+            // Remove from bookmarks if bookmarked
+            const bookmark = bookmarks.find(b => b.pageId === pageId);
+            if (bookmark) {
+              await storage.removeBookmark(pageId);
+              setBookmarks(bookmarks.filter(b => b.pageId !== pageId));
+            }
+
+            // Clean up session breadcrumbs
+            if (session) {
+              const updatedBreadcrumbs = session.breadcrumbs.filter(b => b.id !== pageId);
+              const updatedPages = session.pages.filter(id => id !== pageId);
+
+              if (updatedBreadcrumbs.length > 0) {
+                const updatedSession = {
+                  ...session,
+                  breadcrumbs: updatedBreadcrumbs,
+                  pages: updatedPages,
+                  currentPageId: currentPage?.id === pageId
+                    ? updatedBreadcrumbs[updatedBreadcrumbs.length - 1].id
+                    : session.currentPageId
+                };
+                await storage.saveSession(updatedSession);
+                setSession(updatedSession);
+              } else {
+                // No more breadcrumbs, clear session
+                setSession(null);
+              }
+            }
           }}
         />
       )}
