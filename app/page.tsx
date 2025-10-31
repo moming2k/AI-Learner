@@ -553,17 +553,25 @@ export default function Home() {
       const newPage = await generateFromSelection(selectedText, context, currentPage);
       await storage.savePage(newPage);
 
-      const mindmap = await storage.getMindmap();
-      const parentNode = mindmap.find(n => n.id === currentPage.id);
-      const node = generateMindmapNode(newPage, parentNode);
+      // Fetch only the parent node instead of entire mindmap for better performance
+      const parentNode = await storage.getMindmapNode(currentPage.id);
+      const node = generateMindmapNode(newPage, parentNode || undefined);
+
+      // Batch save both nodes in one call for better performance
+      const nodesToSave = [node];
       if (parentNode) {
         parentNode.children.push(node.id);
-        await storage.saveMindmapNode(parentNode);
+        nodesToSave.unshift(parentNode);
       }
-      await storage.saveMindmapNode(node);
+      await storage.saveMindmapNodes(nodesToSave);
 
-      const updatedPages = await storage.getPages();
-      setAllPages(updatedPages);
+      // Use optimistic update instead of refetching all pages
+      setAllPages(prev => {
+        if (prev.some(page => page.id === newPage.id)) {
+          return prev;
+        }
+        return [...prev, newPage];
+      });
 
       updateToast(toastId, {
         title: `"${selectedText}" is ready!`,
