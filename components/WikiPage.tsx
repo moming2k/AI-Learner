@@ -67,7 +67,7 @@ export default function WikiPage({
       const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
       const rect = range?.getBoundingClientRect();
 
-      if (rect) {
+      if (rect && selection) {
         const context = findContext(selection);
 
         setSelectionData({
