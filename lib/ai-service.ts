@@ -40,7 +40,7 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
   const resolvedId = existingPageId ?? generateId(topic);
 
   // Check cache first
-  const cacheKey = getCacheKey('wiki', topic + (context || ''));
+  const cacheKey = getCacheKey('wiki', `${topic}|${context || ''}`);
   const cached = getFromCache(cacheKey);
   if (cached) {
     return {
