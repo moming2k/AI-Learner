@@ -433,7 +433,13 @@ export default function Home() {
       await storage.saveMindmapNodes(nodesToSave);
 
       // Use optimistic update instead of refetching all pages
-      setAllPages(prev => [...prev, answerPage]);
+      setAllPages(prev => {
+        // Only add answerPage if it does not already exist (by id)
+        if (prev.some(page => page.id === answerPage.id)) {
+          return prev;
+        }
+        return [...prev, answerPage];
+      });
 
       updateToast(toastId, {
         title: `"${question}" is ready!`,
