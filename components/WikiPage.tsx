@@ -64,7 +64,7 @@ export default function WikiPage({
 
     if (selectedText && selectedText.length > 0 && onGenerateFromSelection) {
       // Get selection position
-      const range = selection?.getRangeAt(0);
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
       const rect = range?.getBoundingClientRect();
 
       if (rect) {
