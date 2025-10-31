@@ -9,6 +9,7 @@ interface SelectionPopupProps {
   position: { x: number; y: number };
   onGenerate: (selectedText: string, context: string) => void;
   onClose: () => void;
+  onWidthCalculated?: (width: number) => void;
 }
 
 export default function SelectionPopup({
@@ -16,7 +17,8 @@ export default function SelectionPopup({
   context,
   position,
   onGenerate,
-  onClose
+  onClose,
+  onWidthCalculated
 }: SelectionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(() => {
@@ -31,6 +33,11 @@ export default function SelectionPopup({
       const rect = popup.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
+
+      // Notify parent about popup width for dynamic centering
+      if (onWidthCalculated) {
+        onWidthCalculated(rect.width);
+      }
 
       let { x, y } = position;
       let needsAdjustment = false;
@@ -62,7 +69,7 @@ export default function SelectionPopup({
         });
       }
     }
-  }, [position]);
+  }, [position, onWidthCalculated]);
 
   return (
     <div
