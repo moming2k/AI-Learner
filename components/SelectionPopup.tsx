@@ -57,9 +57,14 @@ export default function SelectionPopup({
 
       if (needsAdjustment) {
         // Use requestAnimationFrame to batch position updates
-        requestAnimationFrame(() => {
+        const frameId = requestAnimationFrame(() => {
           setAdjustedPosition({ x, y });
         });
+        
+        // Cancel the animation frame if component unmounts or position changes
+        return () => {
+          cancelAnimationFrame(frameId);
+        };
       }
     }
   }, [position]);
