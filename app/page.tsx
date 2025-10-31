@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { WikiPage as WikiPageType, LearningSession, Bookmark } from '@/lib/types';
 import { storage } from '@/lib/storage';
-import { generateWikiPage, answerQuestion, generateMindmapNode } from '@/lib/ai-service';
+import { generateWikiPage, answerQuestion, generateMindmapNode, generateFromSelection } from '@/lib/ai-service';
 import TopicSearch from '@/components/TopicSearch';
 import WikiPage from '@/components/WikiPage';
 import QuestionInput from '@/components/QuestionInput';
@@ -483,6 +483,111 @@ export default function Home() {
     }
   };
 
+  const handleGenerateFromSelection = async (selectedText: string, context: string) => {
+    if (!currentPage) return;
+
+    setIsLoading(true);
+
+    // Create a temporary loading ID for this selection
+    const loadingId = `loading-${selectedText.toLowerCase().trim()}-${Date.now()}`;
+    setLoadingPages(prev => new Set(prev).add(loadingId));
+
+    // Create placeholder page immediately
+    const placeholderPage: WikiPageType = {
+      id: loadingId,
+      title: selectedText,
+      content: '# Generating content...\n\nPlease wait while we create this page for you. This usually takes a few seconds.',
+      relatedTopics: [],
+      suggestedQuestions: [],
+      createdAt: Date.now(),
+      isPlaceholder: true,
+      parentId: currentPage.id
+    };
+
+    // Immediately show the placeholder page
+    setCurrentPage(placeholderPage);
+    await updateSession(loadingId, selectedText);
+
+    const toastId = addToast({
+      title: `Generating "${selectedText}"...`,
+      message: 'Creating contextual content based on your selection',
+      type: 'loading',
+      duration: 0
+    });
+
+    try {
+      // Check if a similar page already exists
+      const existingPages = await storage.searchPages(selectedText);
+      const similarPage = existingPages.find(
+        p => p.title.toLowerCase() === selectedText.toLowerCase().trim()
+      );
+
+      if (similarPage && !similarPage.isPlaceholder) {
+        setCurrentPage(similarPage);
+        await updateSession(similarPage.id, similarPage.title);
+        updateToast(toastId, {
+          title: 'Page found',
+          message: `"${similarPage.title}" already exists`,
+          type: 'info',
+          duration: 3000
+        });
+        return;
+      }
+
+      const newPage = await generateFromSelection(selectedText, context, currentPage);
+      await storage.savePage(newPage);
+
+      const mindmap = await storage.getMindmap();
+      const parentNode = mindmap.find(n => n.id === currentPage.id);
+      const node = generateMindmapNode(newPage, parentNode);
+      if (parentNode) {
+        parentNode.children.push(node.id);
+        await storage.saveMindmapNode(parentNode);
+      }
+      await storage.saveMindmapNode(node);
+
+      const updatedPages = await storage.getPages();
+      setAllPages(updatedPages);
+
+      updateToast(toastId, {
+        title: `"${selectedText}" is ready!`,
+        message: 'Page generated successfully from your selection',
+        type: 'success',
+        duration: 5000
+      });
+
+      // Update placeholder with real content
+      setCurrentPage(newPage);
+      await updateSession(newPage.id, newPage.title);
+    } catch (error) {
+      console.error('Error generating from selection:', error);
+
+      updateToast(toastId, {
+        title: 'Failed to generate page',
+        message: 'Please try again',
+        type: 'error',
+        duration: 5000
+      });
+
+      // Update placeholder to show error
+      setCurrentPage(prev => {
+        if (!prev || prev.id !== loadingId) return prev;
+        return {
+          ...prev,
+          content: '# Generation failed\n\nWe encountered an error while generating this page. Please check your API configuration and try again.',
+          isPlaceholder: true
+        };
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingPages(prev => {
+        const updated = new Set(prev);
+        updated.delete(loadingId);
+        return updated;
+      });
+    }
+  };
+
   const handleNavigateToPage = async (pageId: string) => {
     const page = await storage.getPage(pageId);
     if (page) {
@@ -594,6 +699,7 @@ export default function Home() {
                   onNavigate={handleTopicSearch}
                   onRegenerate={handleRegenerateCurrentPage}
                   isLoading={isLoading}
+                  onGenerateFromSelection={handleGenerateFromSelection}
                 />
               </>
             )}
