@@ -192,6 +192,20 @@ export const storage = {
     }
   },
 
+  getMindmapNode: async (nodeId: string): Promise<KnowledgeNode | null> => {
+    try {
+      const response = await fetch(`/api/mindmap?id=${nodeId}`, {
+        headers: getHeaders()
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Failed to fetch mindmap node');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching mindmap node:', error);
+      return null;
+    }
+  },
+
   saveMindmapNode: async (node: KnowledgeNode): Promise<void> => {
     try {
       const response = await fetch('/api/mindmap', {
@@ -202,6 +216,20 @@ export const storage = {
       if (!response.ok) throw new Error('Failed to save mindmap node');
     } catch (error) {
       console.error('Error saving mindmap node:', error);
+      throw error;
+    }
+  },
+
+  saveMindmapNodes: async (nodes: KnowledgeNode[]): Promise<void> => {
+    try {
+      const response = await fetch('/api/mindmap', {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ nodes })
+      });
+      if (!response.ok) throw new Error('Failed to save mindmap nodes');
+    } catch (error) {
+      console.error('Error saving mindmap nodes:', error);
       throw error;
     }
   },
