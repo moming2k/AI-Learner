@@ -11,9 +11,10 @@ interface GenerateWikiParams {
 // Simple in-memory cache for recent generations (helps with duplicate requests)
 const generationCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_KEY_DELIMITER = ':';
 
 function getCacheKey(type: string, key: string): string {
-  return `${type}:${key.toLowerCase().trim()}`;
+  return `${type}${CACHE_KEY_DELIMITER}${key.toLowerCase().trim()}`;
 }
 
 function getFromCache(cacheKey: string): any | null {
@@ -30,7 +31,9 @@ function setCache(cacheKey: string, data: any): void {
   // Clean up old cache entries (keep max 50 items)
   if (generationCache.size > 50) {
     const oldestKey = generationCache.keys().next().value;
-    generationCache.delete(oldestKey);
+    if (oldestKey) {
+      generationCache.delete(oldestKey);
+    }
   }
 }
 
@@ -40,7 +43,7 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
   const resolvedId = existingPageId ?? generateId(topic);
 
   // Check cache first
-  const cacheKey = getCacheKey('wiki', `${topic}|${context || ''}`);
+  const cacheKey = getCacheKey('wiki', `${topic}${CACHE_KEY_DELIMITER}${context || ''}`);
   const cached = getFromCache(cacheKey);
   if (cached) {
     return {
@@ -119,7 +122,7 @@ export async function generateFromSelection(
   currentPage: WikiPage
 ): Promise<WikiPage> {
   // Check cache first
-  const cacheKey = getCacheKey('selection', `${selectedText}:${currentPage.id}`);
+  const cacheKey = getCacheKey('selection', `${selectedText}${CACHE_KEY_DELIMITER}${currentPage.id}`);
   const cached = getFromCache(cacheKey);
   if (cached) {
     return {
@@ -193,7 +196,7 @@ Explain "${selectedText}" as it relates to "${currentPage.title}".`;
 
 export async function answerQuestion(question: string, currentPage: WikiPage): Promise<WikiPage> {
   // Check cache first
-  const cacheKey = getCacheKey('question', `${question}:${currentPage.id}`);
+  const cacheKey = getCacheKey('question', `${question}${CACHE_KEY_DELIMITER}${currentPage.id}`);
   const cached = getFromCache(cacheKey);
   if (cached) {
     return {
