@@ -3,6 +3,8 @@
 import { WikiPage as WikiPageType } from '@/lib/types';
 import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useState, useRef } from 'react';
+import SelectionPopup from './SelectionPopup';
 
 interface WikiPageProps {
   page: WikiPageType;
@@ -12,6 +14,7 @@ interface WikiPageProps {
   onBackgroundGenerate?: (topic: string) => void;
   onRegenerate?: () => void | Promise<void>;
   isLoading?: boolean;
+  onGenerateFromSelection?: (selectedText: string, context: string) => void | Promise<void>;
 }
 
 export default function WikiPage({
@@ -22,10 +25,76 @@ export default function WikiPage({
   onBackgroundGenerate,
   onRegenerate,
   isLoading,
+  onGenerateFromSelection,
 }: WikiPageProps) {
   // Check if this is a generating placeholder (not an error)
   const isGenerating = page.isPlaceholder && page.content.includes('Generating content');
   const isError = page.isPlaceholder && page.content.includes('Generation failed');
+
+  // Selection popup state
+  const [selectionData, setSelectionData] = useState<{
+    text: string;
+    context: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Find the context (paragraph or section) containing the selected text
+  const findContext = (selection: Selection): string => {
+    let node = selection.anchorNode;
+
+    // Traverse up to find the nearest paragraph or section element
+    while (node && node !== contentRef.current) {
+      if (node instanceof Element) {
+        const tagName = node.tagName?.toLowerCase();
+        if (tagName === 'p' || tagName === 'li' || tagName === 'div') {
+          return node.textContent?.trim() || '';
+        }
+      }
+      node = node.parentNode;
+    }
+
+    return '';
+  };
+
+  // Handle text selection
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim();
+
+    if (selectedText && selectedText.length > 0 && onGenerateFromSelection) {
+      // Get selection position
+      const range = selection?.getRangeAt(0);
+      const rect = range?.getBoundingClientRect();
+
+      if (rect) {
+        const context = findContext(selection);
+
+        setSelectionData({
+          text: selectedText,
+          context: context,
+          position: {
+            x: rect.left + rect.width / 2 - 150, // Center popup on selection
+            y: rect.bottom + 10, // Position below selection
+          },
+        });
+      }
+    } else {
+      setSelectionData(null);
+    }
+  };
+
+  const handleGenerateFromSelection = (selectedText: string, context: string) => {
+    if (onGenerateFromSelection) {
+      onGenerateFromSelection(selectedText, context);
+    }
+    setSelectionData(null);
+  };
+
+  const handleClosePopup = () => {
+    setSelectionData(null);
+    window.getSelection()?.removeAllRanges();
+  };
 
   return (
     <article className="bg-white rounded-2xl shadow-xl p-8 max-w-4xl mx-auto">
@@ -100,7 +169,11 @@ export default function WikiPage({
 
       {/* Content - Only show if not generating, always show for errors or real content */}
       {!isGenerating && (
-        <div className="prose prose-lg max-w-none mb-8">
+        <div
+          ref={contentRef}
+          className="prose prose-lg max-w-none mb-8"
+          onMouseUp={handleTextSelection}
+        >
           <ReactMarkdown
           components={{
             h1: ({ children }) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
@@ -176,6 +249,17 @@ export default function WikiPage({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Selection Popup */}
+      {selectionData && (
+        <SelectionPopup
+          selectedText={selectionData.text}
+          context={selectionData.context}
+          position={selectionData.position}
+          onGenerate={handleGenerateFromSelection}
+          onClose={handleClosePopup}
+        />
       )}
     </article>
   );
