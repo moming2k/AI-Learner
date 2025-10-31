@@ -21,6 +21,7 @@ export default function SelectionPopup({
   onWidthCalculated
 }: SelectionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
+  const [editableText, setEditableText] = useState(selectedText);
   const [adjustedPosition, setAdjustedPosition] = useState(() => {
     // Initialize with position, will be adjusted after first render if needed
     return position;
@@ -88,12 +89,18 @@ export default function SelectionPopup({
       {/* Header */}
       <div className="flex items-start justify-between mb-3 gap-2">
         <div className="flex-1">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Selected Text
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Selected Text (Editable)
           </div>
-          <div className="text-sm font-medium text-gray-900 line-clamp-2">
-            &ldquo;{selectedText}&rdquo;
-          </div>
+          <textarea
+            value={editableText}
+            onChange={(e) => setEditableText(e.target.value)}
+            className="w-full text-sm font-medium text-gray-900 p-2 border border-gray-300 rounded-lg
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       resize-none min-h-[60px]"
+            rows={3}
+            placeholder="Edit the selected text..."
+          />
         </div>
         <button
           onClick={onClose}
@@ -118,13 +125,15 @@ export default function SelectionPopup({
 
       {/* Action Button */}
       <button
-        onClick={() => onGenerate(selectedText, context)}
+        onClick={() => onGenerate(editableText, context)}
+        disabled={!editableText.trim()}
         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
                    bg-gradient-to-r from-blue-600 to-indigo-600
                    text-white font-medium text-sm
                    hover:from-blue-700 hover:to-indigo-700
                    transition-all duration-200 hover:shadow-lg
-                   focus:outline-none focus:ring-2 focus:ring-blue-300"
+                   focus:outline-none focus:ring-2 focus:ring-blue-300
+                   disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Sparkles className="w-4 h-4" />
         <span>Generate Page from Selection</span>
