@@ -50,7 +50,14 @@ export default function Home() {
   };
 
   const loadAllData = async (showToast: boolean = false) => {
-    const duplicatesRemoved = await storage.removeDuplicatePages();
+    // Execute all data loading operations in parallel for faster startup
+    const [duplicatesRemoved, savedSession, savedBookmarks, pages] = await Promise.all([
+      storage.removeDuplicatePages(),
+      storage.getCurrentSession(),
+      storage.getBookmarks(),
+      storage.getPages()
+    ]);
+
     if (duplicatesRemoved > 0 && showToast) {
       addToast({
         title: 'Cleanup Complete',
@@ -60,36 +67,30 @@ export default function Home() {
       });
     }
 
-    const savedSession = await storage.getCurrentSession();
-    const savedBookmarks = await storage.getBookmarks();
-    const pages = await storage.getPages();
-
     if (savedSession) {
       // Create a set of valid page IDs in current database
       const validPageIds = new Set(pages.map(p => p.id));
 
       // Clean up loading IDs from breadcrumbs by trying to find the real page
       // AND filter out breadcrumbs that reference pages not in this database
-      const cleanedBreadcrumbs = await Promise.all(
-        savedSession.breadcrumbs.map(async (crumb) => {
-          if (crumb.id.startsWith('loading-')) {
-            // Try to find a page with matching title
-            const matchingPage = pages.find(
-              p => p.title.toLowerCase() === crumb.title.toLowerCase()
-            );
-            if (matchingPage) {
-              return { id: matchingPage.id, title: matchingPage.title };
-            }
-            // If no match found for loading ID, return null to filter it out
-            return null;
+      const cleanedBreadcrumbs = savedSession.breadcrumbs.map((crumb) => {
+        if (crumb.id.startsWith('loading-')) {
+          // Try to find a page with matching title
+          const matchingPage = pages.find(
+            p => p.title.toLowerCase() === crumb.title.toLowerCase()
+          );
+          if (matchingPage) {
+            return { id: matchingPage.id, title: matchingPage.title };
           }
-          // Check if this page ID exists in current database
-          if (!validPageIds.has(crumb.id)) {
-            return null; // Filter out pages from other databases
-          }
-          return crumb;
-        })
-      );
+          // If no match found for loading ID, return null to filter it out
+          return null;
+        }
+        // Check if this page ID exists in current database
+        if (!validPageIds.has(crumb.id)) {
+          return null; // Filter out pages from other databases
+        }
+        return crumb;
+      });
 
       // Filter out null entries (invalid breadcrumbs)
       const validBreadcrumbs = cleanedBreadcrumbs.filter(b => b !== null) as Array<{ id: string; title: string }>;
@@ -303,8 +304,14 @@ export default function Home() {
       const node = generateMindmapNode(page);
       await storage.saveMindmapNode(node);
 
-      const updatedPages = await storage.getPages();
-      setAllPages(updatedPages);
+      // Use optimistic update instead of refetching all pages
+      setAllPages(prev => {
+        const existing = prev.find(p => p.id === page.id);
+        if (existing) {
+          return prev.map(p => p.id === page.id ? page : p);
+        }
+        return [...prev, page];
+      });
 
       updateToast(toastId, {
         title: `"${topic}" is ready!`,
@@ -413,17 +420,26 @@ export default function Home() {
       const answerPage = await answerQuestion(question, currentPage);
       await storage.savePage(answerPage);
 
-      const mindmap = await storage.getMindmap();
-      const parentNode = mindmap.find(n => n.id === currentPage.id);
-      const node = generateMindmapNode(answerPage, parentNode);
+      // Fetch only the parent node instead of entire mindmap for better performance
+      const parentNode = await storage.getMindmapNode(currentPage.id);
+      const node = generateMindmapNode(answerPage, parentNode || undefined);
+
+      // Batch save both nodes in one call for better performance
+      const nodesToSave = [node];
       if (parentNode) {
         parentNode.children.push(node.id);
-        await storage.saveMindmapNode(parentNode);
+        nodesToSave.unshift(parentNode);
       }
-      await storage.saveMindmapNode(node);
+      await storage.saveMindmapNodes(nodesToSave);
 
-      const updatedPages = await storage.getPages();
-      setAllPages(updatedPages);
+      // Use optimistic update instead of refetching all pages
+      setAllPages(prev => {
+        // Only add answerPage if it does not already exist (by id)
+        if (prev.some(page => page.id === answerPage.id)) {
+          return prev;
+        }
+        return [...prev, answerPage];
+      });
 
       updateToast(toastId, {
         title: `"${question}" is ready!`,
