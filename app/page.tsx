@@ -489,7 +489,7 @@ export default function Home() {
     setIsLoading(true);
 
     // Create a temporary loading ID for this selection
-    const loadingId = `loading-${selectedText.toLowerCase().trim()}`;
+    const loadingId = `loading-${selectedText.toLowerCase().trim()}-${Date.now()}`;
     setLoadingPages(prev => new Set(prev).add(loadingId));
 
     // Create placeholder page immediately
