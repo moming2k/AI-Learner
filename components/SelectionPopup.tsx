@@ -92,12 +92,13 @@ export default function SelectionPopup({
       {/* Header */}
       <div className="flex items-start justify-between mb-3 gap-2">
         <div className="flex-1">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <div id="selected-text-label" className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
             Selected Text
           </div>
           <textarea
             value={editableText}
             onChange={(e) => setEditableText(e.target.value)}
+            aria-labelledby="selected-text-label"
             className="w-full text-sm font-medium text-gray-900 p-2 border border-gray-300 rounded-lg
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                        resize-none min-h-[60px]"
