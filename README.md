@@ -27,7 +27,8 @@ A modern, immersive, and highly interactive learning platform where users can ex
 ### Knowledge Management
 - Behind-the-scenes mindmap structure organizing the knowledge graph
 - Intelligent content generation guided by knowledge structure
-- Persistent local storage for all pages and sessions
+- Persistent SQLite database storage for all pages and sessions
+- Multi-database support for organizing different learning libraries
 - Export-ready wiki pages
 
 ## Getting Started
@@ -44,10 +45,20 @@ npm install
 ```
 
 2. Configure your OpenAI API:
+   - Copy the sample environment file:
+```bash
+cp .env.sample .env.local
+```
    - Edit `.env.local` and add your OpenAI API key:
 ```env
 OPENAI_API_KEY=sk-your-openai-api-key-here
-OPENAI_MODEL=gpt-3.5-turbo  # or gpt-4, gpt-4-turbo-preview
+```
+   - Optional: Customize the model (default: gpt-5):
+```env
+OPENAI_MODEL=gpt-4o  # Options: gpt-5, gpt-4o, gpt-4o-mini, gpt-4-turbo-preview, gpt-3.5-turbo
+```
+   - Optional: Use a different API endpoint (for Azure OpenAI or other providers):
+```env
 OPENAI_API_BASE_URL=https://api.openai.com/v1  # default OpenAI endpoint
 ```
 
@@ -73,8 +84,8 @@ npm run dev
 - **Styling**: Tailwind CSS 4 with custom gradients and animations
 - **Icons**: Lucide React
 - **Markdown**: React Markdown for rich content rendering
-- **AI**: OpenAI API (GPT-3.5-turbo by default, supports GPT-4)
-- **Storage**: Browser localStorage for persistence
+- **AI**: OpenAI API (supports GPT-5, GPT-4o, GPT-4o-mini, and GPT-3.5-turbo)
+- **Storage**: Server-side SQLite database with better-sqlite3
 
 ## Architecture
 
@@ -86,30 +97,37 @@ npm run dev
 
 ### Core Systems
 - `lib/ai-service.ts`: AI-powered wiki generation and question answering
-- `lib/storage.ts`: Local storage management for pages, sessions, and bookmarks
+- `lib/storage.ts`: Storage API client layer for pages, sessions, bookmarks, and mindmap
+- `lib/db.ts`: SQLite database layer with better-sqlite3
 - `lib/types.ts`: TypeScript type definitions
 - `app/api/generate/route.ts`: API endpoint for AI content generation
+- `app/api/pages/route.ts`: CRUD endpoint for wiki pages
+- `app/api/sessions/route.ts`: Learning sessions management
+- `app/api/bookmarks/route.ts`: Bookmarks management
+- `app/api/mindmap/route.ts`: Knowledge graph management
 
 ### Data Flow
 1. User enters topic or question
-2. Check if content already exists in local storage
+2. Check if content already exists in SQLite database via API
 3. If not, generate new content via AI API
 4. Update mindmap structure to maintain knowledge graph
-5. Save to local storage and update UI
+5. Save to SQLite database via API and update UI
 6. Track in learning session for navigation
 
 ## Customization
 
 ### API Configuration
 Edit `.env.local` to customize:
-- Model selection: `OPENAI_MODEL` (default: gpt-3.5-turbo)
-  - Options: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview
+- Model selection: `OPENAI_MODEL` (default: gpt-5)
+  - Options: gpt-5, gpt-4o, gpt-4o-mini, gpt-4-turbo-preview, gpt-3.5-turbo
+  - Note: gpt-5 requires special access from OpenAI
 - API endpoint: `OPENAI_API_BASE_URL` (for Azure OpenAI or other providers)
 
 Edit `app/api/generate/route.ts` for advanced settings:
-- Temperature (default: 0.7)
-- Max tokens (default: 2000)
-- Response format
+- Temperature (default: 0.7 for non-GPT-5 models)
+- Max completion tokens (default: 16000)
+- Response format (JSON object)
+- Request timeout (default: 2 minutes)
 
 ### Styling
 - Modify `app/globals.css` for global styles
@@ -134,7 +152,8 @@ Edit prompts in `lib/ai-service.ts` to customize:
 - Automatic session creation on first topic
 - Breadcrumb navigation (last 10 pages)
 - Page count tracking
-- Session persistence across browser sessions
+- Session persistence in SQLite database
+- Survives browser restarts and page refreshes
 
 ### Smart Deduplication
 - Exact match detection for topics
@@ -163,8 +182,8 @@ npm run lint
 Modern browsers with:
 - ES6+ JavaScript support
 - CSS Grid and Flexbox
-- Local Storage API
 - Fetch API
+- Recommended: Latest Chrome, Firefox, Safari, or Edge
 
 ## License
 
