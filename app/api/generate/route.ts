@@ -7,7 +7,7 @@ export const maxDuration = 300; // 5 minutes max execution time
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages } = body;
+    const { messages, stream = false } = body;
 
     const apiKey = process.env.OPENAI_API_KEY;
     const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1';
@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
       model,
       messages,
       response_format: { type: 'json_object' },
-      max_completion_tokens: 16000,
+      max_completion_tokens: 8000, // Reduced from 16000 for faster responses
+      stream,
     };
 
     if (!model.startsWith('gpt-5')) {
@@ -58,6 +59,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Handle streaming response
+      if (stream && response.body) {
+        // Return streaming response as-is
+        return new Response(response.body, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+      }
+
+      // Handle non-streaming response (original behavior)
       const data = await response.json();
       const choice = data?.choices?.[0];
       const content = choice?.message?.content;

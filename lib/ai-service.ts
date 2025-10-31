@@ -8,29 +8,62 @@ interface GenerateWikiParams {
   existingPageId?: string;
 }
 
+// Simple in-memory cache for recent generations (helps with duplicate requests)
+const generationCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(type: string, key: string): string {
+  return `${type}:${key.toLowerCase().trim()}`;
+}
+
+function getFromCache(cacheKey: string): any | null {
+  const cached = generationCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  generationCache.delete(cacheKey);
+  return null;
+}
+
+function setCache(cacheKey: string, data: any): void {
+  generationCache.set(cacheKey, { data, timestamp: Date.now() });
+  // Clean up old cache entries (keep max 50 items)
+  if (generationCache.size > 50) {
+    const oldestKey = Array.from(generationCache.keys())[0];
+    generationCache.delete(oldestKey);
+  }
+}
+
 export async function generateWikiPage(params: GenerateWikiParams): Promise<WikiPage> {
   const { topic, context, relatedPages, parentId, existingPageId } = params;
 
   const resolvedId = existingPageId ?? generateId(topic);
 
-  const systemPrompt = `You are an expert educational content creator. Generate comprehensive, well-structured wiki content that is:
-- Accurate and informative
-- Well-organized with clear sections
-- Written in an engaging, accessible style
-- Rich with examples and explanations
-- Connected to related concepts
+  // Check cache first
+  const cacheKey = getCacheKey('wiki', topic + (context || ''));
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    return {
+      id: resolvedId,
+      ...cached,
+      createdAt: Date.now(),
+      parentId,
+      isPlaceholder: false
+    };
+  }
 
-Format your response as JSON with this structure:
+  // Optimized, more concise system prompt
+  const systemPrompt = `You are an expert educator. Create a comprehensive wiki page as JSON:
 {
   "title": "Topic Title",
-  "content": "Rich markdown content with ## headings, **bold**, *italic*, lists, etc.",
-  "relatedTopics": ["Related Topic 1", "Related Topic 2", "Related Topic 3"],
+  "content": "Markdown content with ## headings, **bold**, lists, examples",
+  "relatedTopics": ["Topic 1", "Topic 2", "Topic 3"],
   "suggestedQuestions": ["Question 1?", "Question 2?", "Question 3?"]
 }`;
 
   const userPrompt = context
-    ? `Generate a wiki page about "${topic}" in the context of: ${context}\n\nRelated existing pages: ${relatedPages?.map(p => p.title).join(', ') || 'None'}`
-    : `Generate a comprehensive wiki page about "${topic}". Include an overview, key concepts, important details, and practical applications.`;
+    ? `Wiki page: "${topic}"\nContext: ${context}\nRelated: ${relatedPages?.map(p => p.title).join(', ') || 'None'}`
+    : `Create a comprehensive wiki page about "${topic}" with overview, key concepts, details, and applications.`;
 
   try {
     const response = await fetch('/api/generate', {
@@ -40,7 +73,8 @@ Format your response as JSON with this structure:
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ]
+        ],
+        stream: false // Can be set to true for streaming in future enhancement
       })
     });
 
@@ -49,6 +83,9 @@ Format your response as JSON with this structure:
     }
 
     const data = await response.json();
+
+    // Cache the result
+    setCache(cacheKey, data);
 
     const page: WikiPage = {
       id: resolvedId,
@@ -81,29 +118,33 @@ export async function generateFromSelection(
   context: string,
   currentPage: WikiPage
 ): Promise<WikiPage> {
-  const systemPrompt = `You are an expert educator creating detailed content based on highlighted text. Create a comprehensive wiki page that:
-- Explains the selected term/concept in depth
-- Uses the provided context to understand the specific meaning and usage
-- Provides relevant examples and explanations
-- Connects to related concepts
-- Is tailored to the context of where the text was selected from
+  // Check cache first
+  const cacheKey = getCacheKey('selection', `${selectedText}:${currentPage.id}`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    return {
+      id: generateId(selectedText),
+      ...cached,
+      createdAt: Date.now(),
+      parentId: currentPage.id,
+      isPlaceholder: false
+    };
+  }
 
-Format as JSON:
+  // Optimized, concise system prompt
+  const systemPrompt = `Expert educator explaining highlighted text. Return JSON:
 {
-  "title": "Clear, descriptive title for the concept",
-  "content": "Comprehensive markdown content explaining the selected text with context-aware details",
-  "relatedTopics": ["Related Topic 1", "Related Topic 2", "Related Topic 3"],
-  "suggestedQuestions": ["Follow-up Question 1?", "Follow-up Question 2?", "Follow-up Question 3?"]
+  "title": "Clear concept title",
+  "content": "Markdown explanation with examples",
+  "relatedTopics": ["Topic 1", "Topic 2", "Topic 3"],
+  "suggestedQuestions": ["Question 1?", "Question 2?", "Question 3?"]
 }`;
 
-  const userPrompt = `Current page: ${currentPage.title}
+  const userPrompt = `Page: ${currentPage.title}
+Selected: "${selectedText}"
+Context: "${context}"
 
-Selected text: "${selectedText}"
-
-Context from the page where this was selected:
-"${context}"
-
-Create a detailed wiki page about "${selectedText}" that takes into account the specific context and usage shown above. The explanation should be relevant to how this term/concept appears in the context of "${currentPage.title}".`;
+Explain "${selectedText}" as it relates to "${currentPage.title}".`;
 
   try {
     const response = await fetch('/api/generate', {
@@ -113,7 +154,8 @@ Create a detailed wiki page about "${selectedText}" that takes into account the 
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ]
+        ],
+        stream: false
       })
     });
 
@@ -122,6 +164,9 @@ Create a detailed wiki page about "${selectedText}" that takes into account the 
     }
 
     const data = await response.json();
+
+    // Cache the result
+    setCache(cacheKey, data);
 
     return {
       id: generateId(selectedText),
@@ -147,21 +192,32 @@ Create a detailed wiki page about "${selectedText}" that takes into account the 
 }
 
 export async function answerQuestion(question: string, currentPage: WikiPage): Promise<WikiPage> {
-  const systemPrompt = `You are an expert educator answering a student's question. Create a focused wiki page that:
-- Directly answers the question
-- Provides context from the current topic
-- Includes relevant examples
-- Links to related concepts
+  // Check cache first
+  const cacheKey = getCacheKey('question', `${question}:${currentPage.id}`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    return {
+      id: generateId(question),
+      ...cached,
+      createdAt: Date.now(),
+      parentId: currentPage.id,
+      isPlaceholder: false
+    };
+  }
 
-Format as JSON:
+  // Optimized, concise system prompt
+  const systemPrompt = `Expert educator answering questions. Return JSON:
 {
-  "title": "Concise Answer Title",
-  "content": "Detailed markdown content answering the question",
-  "relatedTopics": ["Related Topic 1", "Related Topic 2"],
-  "suggestedQuestions": ["Follow-up Question 1?", "Follow-up Question 2?"]
+  "title": "Concise answer title",
+  "content": "Markdown answer with examples",
+  "relatedTopics": ["Topic 1", "Topic 2"],
+  "suggestedQuestions": ["Question 1?", "Question 2?"]
 }`;
 
-  const userPrompt = `Current topic: ${currentPage.title}\n\nQuestion: ${question}\n\nProvide a comprehensive answer that builds on the current topic.`;
+  const userPrompt = `Topic: ${currentPage.title}
+Question: ${question}
+
+Answer comprehensively, building on the current topic.`;
 
   try {
     const response = await fetch('/api/generate', {
@@ -171,7 +227,8 @@ Format as JSON:
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ]
+        ],
+        stream: false
       })
     });
 
@@ -180,6 +237,9 @@ Format as JSON:
     }
 
     const data = await response.json();
+
+    // Cache the result
+    setCache(cacheKey, data);
 
     return {
       id: generateId(question),
