@@ -36,7 +36,9 @@ Use `npm run test-openai` to verify API configuration before running the applica
 
 2. **Question Flow**: User asks question → Check for similar existing page → If not found, call `answerQuestion()` with current page context → Generate answer as new page → Link to parent in mindmap → Update session breadcrumbs → Display answer
 
-3. **Storage Architecture**: All data persists in server-side SQLite database (`data/wiki.db`):
+3. **Selection-Based Generation Flow**: User selects text on wiki page → SelectionPopup appears → User clicks "Generate Page from Selection" → Extract surrounding context (paragraph/section) → Call `generateFromSelection()` with selected text + context → AI generates contextual page → Link to parent in mindmap → Navigate to new page
+
+4. **Storage Architecture**: All data persists in server-side SQLite database (`data/wiki.db`):
    - `wiki_pages` table: All generated WikiPage objects
    - `learning_sessions` table: User session tracking with breadcrumbs
    - `bookmarks` table: Saved page references
@@ -60,6 +62,7 @@ Use `npm run test-openai` to verify API configuration before running the applica
 - **`lib/ai-service.ts`**: Core AI functions:
   - `generateWikiPage()`: Creates comprehensive wiki from topic
   - `answerQuestion()`: Generates contextualized answer pages
+  - `generateFromSelection()`: Creates contextual pages from highlighted text with surrounding context
   - `generateMindmapNode()`: Creates knowledge graph nodes
   - Contains system prompts defining AI behavior
 
@@ -75,11 +78,14 @@ Use `npm run test-openai` to verify API configuration before running the applica
 app/page.tsx (root state)
 ├─ TopicSearch.tsx        # Initial topic entry interface
 ├─ QuestionInput.tsx      # Sticky question input on every page
-├─ WikiPage.tsx           # Markdown rendering, bookmarks, related topics
+├─ WikiPage.tsx           # Markdown rendering, bookmarks, related topics, text selection
+│  └─ SelectionPopup.tsx  # Popup for generating pages from selected text
 └─ Sidebar.tsx            # Breadcrumbs, bookmarks, search, related topics
 ```
 
 Props flow down from page.tsx with callbacks for state updates. No external state management library.
+
+**Text Selection Feature**: WikiPage detects text selection via `onMouseUp` event, extracts surrounding context from the DOM (paragraph/section), and shows SelectionPopup. The popup allows users to generate new pages based on the selected text with full context awareness.
 
 ## AI Integration
 
@@ -101,9 +107,14 @@ The API route (`app/api/generate/route.ts:18-29`) has special handling:
 
 ### Prompt Engineering
 
-Both `generateWikiPage()` and `answerQuestion()` in `lib/ai-service.ts` use system + user prompt pattern:
+All generation functions in `lib/ai-service.ts` use system + user prompt pattern:
+- `generateWikiPage()`: Creates comprehensive wiki pages from topics
+- `answerQuestion()`: Generates answer pages based on questions
+- `generateFromSelection()`: Creates context-aware pages from highlighted text + surrounding content
+
+Each function:
 - System prompt defines content creator persona and JSON response structure
-- User prompt provides topic/question and context
+- User prompt provides topic/question/selection and context
 - Expected JSON: `{ title, content, relatedTopics[], suggestedQuestions[] }`
 
 When modifying AI behavior, update system prompts in `lib/ai-service.ts`.
