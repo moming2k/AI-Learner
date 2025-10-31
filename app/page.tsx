@@ -50,7 +50,7 @@ export default function Home() {
   };
 
   const loadAllData = async (showToast: boolean = false) => {
-    // Execute all data loading operations in parallel for 4x faster startup
+    // Execute all data loading operations in parallel for faster startup
     const [duplicatesRemoved, savedSession, savedBookmarks, pages] = await Promise.all([
       storage.removeDuplicatePages(),
       storage.getCurrentSession(),
