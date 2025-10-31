@@ -147,7 +147,7 @@ export function getDbPages(dbName: string = 'default') {
         db.exec('COMMIT');
 
         // Return number of deleted rows
-        return (result as any).changes || 0;
+        return (result as Database.RunResult).changes || 0;
       } catch (error) {
         db.exec('ROLLBACK');
         throw error;
