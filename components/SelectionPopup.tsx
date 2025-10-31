@@ -22,6 +22,9 @@ export default function SelectionPopup({
 }: SelectionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [editableText, setEditableText] = useState(selectedText);
+  useEffect(() => {
+    setEditableText(selectedText);
+  }, [selectedText]);
   const [adjustedPosition, setAdjustedPosition] = useState(() => {
     // Initialize with position, will be adjusted after first render if needed
     return position;
