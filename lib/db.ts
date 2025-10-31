@@ -124,28 +124,34 @@ export function getDbPages(dbName: string = 'default') {
 
     removeDuplicates: (): number => {
       const db = getDatabase(dbName);
-      const duplicates = db.prepare(`
-        SELECT LOWER(TRIM(title)) as normalized_title, COUNT(*) as count
-        FROM wiki_pages
-        GROUP BY normalized_title
-        HAVING count > 1
-      `).all();
 
-      let totalRemoved = 0;
-      for (const dup of duplicates as Array<{ normalized_title: string; count: number }>) {
-        const pages = db.prepare(`
-          SELECT id, created_at FROM wiki_pages
-          WHERE LOWER(TRIM(title)) = ?
-          ORDER BY created_at DESC
-        `).all(dup.normalized_title);
+      // Use transaction for atomicity and better performance
+      db.exec('BEGIN TRANSACTION');
 
-        const toDelete = (pages as Array<{ id: string; created_at: number }>).slice(1);
-        for (const page of toDelete) {
-          db.prepare('DELETE FROM wiki_pages WHERE id = ?').run(page.id);
-          totalRemoved++;
-        }
+      try {
+        // Single query using window function to identify and delete duplicates
+        // Keeps the most recent page (highest created_at) for each normalized title
+        const result = db.prepare(`
+          DELETE FROM wiki_pages WHERE id IN (
+            SELECT id FROM (
+              SELECT id, ROW_NUMBER() OVER (
+                PARTITION BY LOWER(TRIM(title))
+                ORDER BY created_at DESC
+              ) as rn
+              FROM wiki_pages
+            ) t
+            WHERE rn > 1
+          )
+        `).run();
+
+        db.exec('COMMIT');
+
+        // Return number of deleted rows
+        return (result as any).changes || 0;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
       }
-      return totalRemoved;
     },
 
     deleteAll: () => {
@@ -245,6 +251,12 @@ export function getDbMindmap(dbName: string = 'default') {
       const db = getDatabase(dbName);
       const rows = db.prepare('SELECT * FROM knowledge_nodes').all();
       return rows.map(rowToKnowledgeNode);
+    },
+
+    getById: (id: string): KnowledgeNode | null => {
+      const db = getDatabase(dbName);
+      const row = db.prepare('SELECT * FROM knowledge_nodes WHERE id = ?').get(id);
+      return row ? rowToKnowledgeNode(row) : null;
     },
 
     save: (node: KnowledgeNode) => {

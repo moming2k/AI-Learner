@@ -8,6 +8,18 @@ export async function GET(request: NextRequest) {
     const dbName = getDatabaseName(request);
     const dbMindmap = getDbMindmap(dbName);
 
+    // Support fetching single node by ID for performance optimization
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+
+    if (id) {
+      const node = dbMindmap.getById(id);
+      if (!node) {
+        return NextResponse.json({ error: 'Node not found' }, { status: 404 });
+      }
+      return NextResponse.json(node);
+    }
+
     const nodes = dbMindmap.getAll();
     return NextResponse.json(nodes);
   } catch (error) {
@@ -21,8 +33,24 @@ export async function POST(request: NextRequest) {
     const dbName = getDatabaseName(request);
     const dbMindmap = getDbMindmap(dbName);
 
-    const node: KnowledgeNode = await request.json();
+    const body = await request.json();
 
+    // Support batch saves for performance optimization
+    if (Array.isArray(body.nodes)) {
+      for (const node of body.nodes) {
+        if (!node.id || !node.title || node.depth === undefined) {
+          return NextResponse.json(
+            { error: 'Missing required fields in one or more nodes' },
+            { status: 400 }
+          );
+        }
+        dbMindmap.save(node);
+      }
+      return NextResponse.json({ success: true, count: body.nodes.length });
+    }
+
+    // Single node save (backwards compatibility)
+    const node: KnowledgeNode = body;
     if (!node.id || !node.title || node.depth === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
