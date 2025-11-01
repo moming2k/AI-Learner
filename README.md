@@ -4,6 +4,9 @@
 
 A modern, immersive, and highly interactive learning platform where users can explore knowledge through AI-generated wiki pages and intelligent questioning.
 
+![AI Learning Wiki Interface](public/screenshots/app-interface-en.png)
+*Interactive interface of AI Learning Wiki, showcasing the Cash-Out Refinance topic page*
+
 ## Features
 
 ### Dynamic Wiki System

@@ -4,6 +4,9 @@
 
 Una plataforma de aprendizaje moderna, inmersiva y altamente interactiva donde los usuarios pueden explorar conocimientos a través de páginas wiki generadas por IA y preguntas inteligentes.
 
+![Interfaz de Wiki de Aprendizaje con IA](public/screenshots/app-interface-en.png)
+*Interfaz interactiva de Wiki de Aprendizaje con IA, mostrando la página del tema de Refinanciamiento Cash-Out*
+
 ## Características
 
 ### Sistema Wiki Dinámico
