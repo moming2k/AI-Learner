@@ -226,10 +226,13 @@ export default function Home() {
     // Create the job
     const job = await storage.createJob(type, input);
 
-    // Trigger processing in the background
-    storage.processJob(job.id).catch(err => {
+    // Trigger processing and fail fast if it fails
+    try {
+      await storage.processJob(job.id);
+    } catch (err) {
       console.error('Error processing job:', err);
-    });
+      throw err;
+    }
 
     // Poll for completion
     return new Promise((resolve, reject) => {
