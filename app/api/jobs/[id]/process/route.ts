@@ -13,9 +13,6 @@ export async function POST(
     const dbPages = getDbPages(dbName);
 
     const { id } = await params;
-    const dbName = getDatabaseName(request);
-    const dbJobs = getDbJobs(dbName);
-    const dbPages = getDbPages(dbName);
 
     // Get the job
     const job = dbJobs.getById(id);
