@@ -192,7 +192,9 @@ npm run lint
 
 ## 授權條款
 
-MIT
+本專案採用 GNU Affero 通用公共授權條款 v3.0 (AGPL-3.0) 授權 - 詳情請參閱 [LICENSE](LICENSE) 檔案。
+
+AGPL-3.0 是一個自由的 copyleft 授權條款，要求任何在伺服器上執行本軟體修改版本的人必須向使用者提供修改後的原始碼。
 
 ## 貢獻
 
