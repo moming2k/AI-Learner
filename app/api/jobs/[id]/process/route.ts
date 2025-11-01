@@ -91,7 +91,7 @@ export async function POST(
       }
 
       // Save the generated page to the same database context as the job
-      (job.dbPages ?? dbPages).save(result);
+      dbPages.save(result);
 
       // Update job with result
       dbJobs.updateOutput(id, result);
