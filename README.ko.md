@@ -192,7 +192,9 @@ npm run lint
 
 ## 라이선스
 
-MIT
+이 프로젝트는 GNU Affero General Public License v3.0(AGPL-3.0)에 따라 라이선스가 부여됩니다 - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+AGPL-3.0은 서버에서 이 소프트웨어의 수정된 버전을 실행하는 사람이 수정된 소스 코드를 사용자가 이용할 수 있도록 해야 하는 자유 카피레프트 라이선스입니다.
 
 ## 기여
 

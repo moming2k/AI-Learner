@@ -192,7 +192,9 @@ Modern browsers with:
 
 ## License
 
-MIT
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
+
+The AGPL-3.0 is a free, copyleft license that requires anyone who runs a modified version of this software on a server to make the modified source code available to users.
 
 ## Contributing
 
