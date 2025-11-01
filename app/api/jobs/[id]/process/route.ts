@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbJobs, dbPages } from '@/lib/db';
+import { getDbJobs, getDbPages } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { generateWikiPage, answerQuestion, generateFromSelection } from '@/lib/ai-service';
 
 export async function POST(
@@ -8,6 +9,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const dbName = getDatabaseName(request);
+    const dbJobs = getDbJobs(dbName);
+    const dbPages = getDbPages(dbName);
 
     // Get the job
     const job = dbJobs.getById(id);
