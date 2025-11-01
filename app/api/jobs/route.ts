@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbJobs } from '@/lib/db';
+import { getDbJobs } from '@/lib/db';
+import { getDatabaseName } from '@/lib/db-utils';
 import { GenerationJob, GenerationJobType, GenerationJobInput } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbJobs = getDbJobs(dbName);
+
     const body = await request.json();
     const { type, input } = body as { type: GenerationJobType; input: GenerationJobInput };
 
@@ -40,6 +44,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbJobs = getDbJobs(dbName);
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -68,6 +75,9 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbJobs = getDbJobs(dbName);
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
