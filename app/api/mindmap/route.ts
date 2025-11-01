@@ -38,12 +38,14 @@ export async function POST(request: NextRequest) {
     // Support batch saves for performance optimization
     if (Array.isArray(body.nodes)) {
       try {
-        for (const node of body.nodes) {
-          if (!node.id || !node.title || node.depth === undefined) {
-            throw new Error('Missing required fields in one or more nodes');
+        await dbMindmap.transaction(async () => {
+          for (const node of body.nodes) {
+            if (!node.id || !node.title || node.depth === undefined) {
+              throw new Error('Missing required fields in one or more nodes');
+            }
+            dbMindmap.save(node);
           }
-          dbMindmap.save(node);
-        }
+        });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Missing required fields in one or more nodes';
         return NextResponse.json(
