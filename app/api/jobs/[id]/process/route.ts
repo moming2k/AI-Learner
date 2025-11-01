@@ -8,6 +8,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const dbName = getDatabaseName(request);
+    const dbJobs = getDbJobs(dbName);
+    const dbPages = getDbPages(dbName);
+
     const { id } = await params;
     const dbName = getDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
