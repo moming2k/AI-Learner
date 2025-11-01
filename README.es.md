@@ -192,7 +192,9 @@ Navegadores modernos con:
 
 ## Licencia
 
-MIT
+Este proyecto está licenciado bajo la Licencia Pública General Affero de GNU v3.0 (AGPL-3.0) - consulte el archivo [LICENSE](LICENSE) para más detalles.
+
+La AGPL-3.0 es una licencia libre de copyleft que requiere que cualquiera que ejecute una versión modificada de este software en un servidor ponga el código fuente modificado a disposición de los usuarios.
 
 ## Contribuir
 
