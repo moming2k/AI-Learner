@@ -239,27 +239,31 @@ export default function Home() {
 
           if (!updatedJob) {
             clearInterval(pollInterval);
+            clearTimeout(timeoutId);
             reject(new Error('Job not found'));
             return;
           }
 
           if (updatedJob.status === 'completed' && updatedJob.output) {
             clearInterval(pollInterval);
+            clearTimeout(timeoutId);
             resolve(updatedJob.output);
           } else if (updatedJob.status === 'failed') {
             clearInterval(pollInterval);
+            clearTimeout(timeoutId);
             reject(new Error(updatedJob.error || 'Job failed'));
           } else if (onProgress) {
             onProgress();
           }
         } catch (error) {
           clearInterval(pollInterval);
+          clearTimeout(timeoutId);
           reject(error);
         }
       }, 1000); // Poll every second
 
       // Set a timeout of 5 minutes
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         clearInterval(pollInterval);
         reject(new Error('Job timeout'));
       }, 5 * 60 * 1000);
