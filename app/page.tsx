@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WikiPage as WikiPageType, LearningSession, Bookmark } from '@/lib/types';
+import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
-import { generateWikiPage, answerQuestion, generateMindmapNode, generateFromSelection } from '@/lib/ai-service';
+import { generateMindmapNode } from '@/lib/ai-service';
 import TopicSearch from '@/components/TopicSearch';
 import WikiPage from '@/components/WikiPage';
 import QuestionInput from '@/components/QuestionInput';
@@ -217,6 +217,55 @@ export default function Home() {
     setSession(updatedSession);
   };
 
+  // Helper function to create a generation job and poll for completion
+  const createAndPollJob = async (
+    type: GenerationJobType,
+    input: GenerationJobInput,
+    onProgress?: () => void
+  ): Promise<WikiPageType> => {
+    // Create the job
+    const job = await storage.createJob(type, input);
+
+    // Trigger processing in the background
+    storage.processJob(job.id).catch(err => {
+      console.error('Error processing job:', err);
+    });
+
+    // Poll for completion
+    return new Promise((resolve, reject) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const updatedJob = await storage.getJob(job.id);
+
+          if (!updatedJob) {
+            clearInterval(pollInterval);
+            reject(new Error('Job not found'));
+            return;
+          }
+
+          if (updatedJob.status === 'completed' && updatedJob.output) {
+            clearInterval(pollInterval);
+            resolve(updatedJob.output);
+          } else if (updatedJob.status === 'failed') {
+            clearInterval(pollInterval);
+            reject(new Error(updatedJob.error || 'Job failed'));
+          } else if (onProgress) {
+            onProgress();
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+          reject(error);
+        }
+      }, 1000); // Poll every second
+
+      // Set a timeout of 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        reject(new Error('Job timeout'));
+      }, 5 * 60 * 1000);
+    });
+  };
+
   const handleTopicSearch = async (
     topic: string,
     navigateAfter = true,
@@ -295,9 +344,9 @@ export default function Home() {
     });
 
     try {
-      const page = await generateWikiPage({
+      const page = await createAndPollJob('wiki_page', {
         topic,
-        existingPageId: shouldReuseExistingId && exactMatch ? exactMatch.id : undefined
+        parentId: undefined
       });
       await storage.savePage(page);
 
@@ -417,7 +466,11 @@ export default function Home() {
         return;
       }
 
-      const answerPage = await answerQuestion(question, currentPage);
+      const answerPage = await createAndPollJob('question', {
+        question,
+        currentPageContent: currentPage.content,
+        parentId: currentPage.id
+      });
       await storage.savePage(answerPage);
 
       // Fetch only the parent node instead of entire mindmap for better performance
@@ -550,7 +603,11 @@ export default function Home() {
         return;
       }
 
-      const newPage = await generateFromSelection(selectedText, context, currentPage);
+      const newPage = await createAndPollJob('selection', {
+        selectedText,
+        context,
+        parentId: currentPage.id
+      });
       await storage.savePage(newPage);
 
       // Fetch only the parent node instead of entire mindmap for better performance

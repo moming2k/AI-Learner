@@ -1,6 +1,6 @@
 'use client';
 
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, GenerationJobType, GenerationJobInput } from './types';
 
 const DB_STORAGE_KEY = 'selectedDatabase';
 const DB_HEADER_NAME = 'x-database-name';
@@ -289,6 +289,66 @@ export const storage = {
         duplicatesFound: 0,
         duplicateGroups: []
       };
+    }
+  },
+
+  // Generation Jobs
+  createJob: async (type: GenerationJobType, input: GenerationJobInput): Promise<GenerationJob> => {
+    try {
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ type, input })
+      });
+      if (!response.ok) throw new Error('Failed to create job');
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating job:', error);
+      throw error;
+    }
+  },
+
+  getJob: async (id: string): Promise<GenerationJob | null> => {
+    try {
+      const response = await fetch(`/api/jobs?id=${id}`, {
+        headers: getHeaders()
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Failed to fetch job');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching job:', error);
+      return null;
+    }
+  },
+
+  processJob: async (id: string): Promise<GenerationJob> => {
+    try {
+      const response = await fetch(`/api/jobs/${id}/process`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process job');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error processing job:', error);
+      throw error;
+    }
+  },
+
+  getAllJobs: async (): Promise<GenerationJob[]> => {
+    try {
+      const response = await fetch('/api/jobs', {
+        headers: getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch jobs');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      return [];
     }
   },
 

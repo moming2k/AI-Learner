@@ -37,20 +37,17 @@ export async function POST(request: NextRequest) {
 
     // Support batch saves for performance optimization
     if (Array.isArray(body.nodes)) {
-      // Wrap batch saves in a transaction for performance and atomicity
-      const batchSave = dbMindmap.db.transaction((nodes: KnowledgeNode[]) => {
-        for (const node of nodes) {
+      try {
+        for (const node of body.nodes) {
           if (!node.id || !node.title || node.depth === undefined) {
             throw new Error('Missing required fields in one or more nodes');
           }
           dbMindmap.save(node);
         }
-      });
-      try {
-        batchSave(body.nodes);
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Missing required fields in one or more nodes';
         return NextResponse.json(
-          { error: err.message || 'Missing required fields in one or more nodes' },
+          { error: errorMessage },
           { status: 400 }
         );
       }
