@@ -62,6 +62,12 @@ export function useJobPolling(options: UseJobPollingOptions = {}): UseJobPolling
         // Trigger processing in the background
         storage.processJob(jobId).catch(err => {
           console.error('Error triggering job processing:', err);
+          stopPolling();
+          const error = err instanceof Error ? err : new Error('Error triggering job processing');
+          setError(error);
+          if (onError) {
+            onError(error);
+          }
         });
       }
 
