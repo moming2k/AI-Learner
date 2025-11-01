@@ -1,6 +1,11 @@
 # AI Learning Wiki
 
+[English](README.md) | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
 A modern, immersive, and highly interactive learning platform where users can explore knowledge through AI-generated wiki pages and intelligent questioning.
+
+![AI Learning Wiki Interface](public/screenshots/app-interface-en.png)
+*Interactive interface of AI Learning Wiki, showcasing the Cash-Out Refinance topic page*
 
 ## Features
 
