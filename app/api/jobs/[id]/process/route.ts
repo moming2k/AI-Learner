@@ -85,8 +85,8 @@ export async function POST(
           throw new Error(`Unknown job type: ${job.type}`);
       }
 
-      // Save the generated page to database
-      dbPages.save(result);
+      // Save the generated page to the same database context as the job
+      (job.dbPages ?? dbPages).save(result);
 
       // Update job with result
       dbJobs.updateOutput(id, result);
