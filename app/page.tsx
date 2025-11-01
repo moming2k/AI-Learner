@@ -297,7 +297,18 @@ export default function Home() {
     try {
       const page = await generateWikiPage({
         topic,
-        existingPageId: shouldReuseExistingId && exactMatch ? exactMatch.id : undefined
+        existingPageId: shouldReuseExistingId && exactMatch ? exactMatch.id : undefined,
+        onProgress: navigateAfter ? (content) => {
+          // Update the placeholder page with streaming content
+          setCurrentPage(prev => {
+            if (!prev || prev.id !== loadingId) return prev;
+            return {
+              ...prev,
+              content: content,
+              isPlaceholder: true
+            };
+          });
+        } : undefined
       });
       await storage.savePage(page);
 
@@ -417,7 +428,21 @@ export default function Home() {
         return;
       }
 
-      const answerPage = await answerQuestion(question, currentPage);
+      const answerPage = await answerQuestion({
+        question,
+        currentPage,
+        onProgress: (content) => {
+          // Update the placeholder page with streaming content
+          setCurrentPage(prev => {
+            if (!prev || prev.id !== loadingId) return prev;
+            return {
+              ...prev,
+              content: content,
+              isPlaceholder: true
+            };
+          });
+        }
+      });
       await storage.savePage(answerPage);
 
       // Fetch only the parent node instead of entire mindmap for better performance
@@ -550,7 +575,22 @@ export default function Home() {
         return;
       }
 
-      const newPage = await generateFromSelection(selectedText, context, currentPage);
+      const newPage = await generateFromSelection({
+        selectedText,
+        context,
+        currentPage,
+        onProgress: (content) => {
+          // Update the placeholder page with streaming content
+          setCurrentPage(prev => {
+            if (!prev || prev.id !== loadingId) return prev;
+            return {
+              ...prev,
+              content: content,
+              isPlaceholder: true
+            };
+          });
+        }
+      });
       await storage.savePage(newPage);
 
       // Fetch only the parent node instead of entire mindmap for better performance

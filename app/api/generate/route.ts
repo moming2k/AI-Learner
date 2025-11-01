@@ -61,8 +61,54 @@ export async function POST(request: NextRequest) {
 
       // Handle streaming response
       if (stream && response.body) {
-        // Return streaming response as-is
-        return new Response(response.body, {
+        const reader = response.body.getReader();
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        const streamResponse = new ReadableStream({
+          async start(controller) {
+            let buffer = '';
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+
+                    try {
+                      const parsed = JSON.parse(data);
+                      const content = parsed.choices?.[0]?.delta?.content;
+
+                      if (content) {
+                        buffer += content;
+                        // Send the accumulated content
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ content: buffer, delta: content })}\n\n`)
+                        );
+                      }
+                    } catch (e) {
+                      // Skip parsing errors for incomplete JSON
+                    }
+                  }
+                }
+              }
+
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            } catch (error) {
+              controller.error(error);
+            }
+          },
+        });
+
+        return new Response(streamResponse, {
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',

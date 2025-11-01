@@ -6,6 +6,20 @@ interface GenerateWikiParams {
   relatedPages?: WikiPage[];
   parentId?: string;
   existingPageId?: string;
+  onProgress?: (content: string) => void;
+}
+
+interface GenerateQuestionParams {
+  question: string;
+  currentPage: WikiPage;
+  onProgress?: (content: string) => void;
+}
+
+interface GenerateSelectionParams {
+  selectedText: string;
+  context: string;
+  currentPage: WikiPage;
+  onProgress?: (content: string) => void;
 }
 
 // Simple in-memory cache for recent generations (helps with duplicate requests)
@@ -37,22 +51,73 @@ function setCache(cacheKey: string, data: any): void {
   }
 }
 
+async function handleStreamResponse(
+  response: Response,
+  onProgress?: (content: string) => void
+): Promise<any> {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let accumulatedContent = '';
+
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              accumulatedContent = parsed.content;
+              if (onProgress) {
+                onProgress(accumulatedContent);
+              }
+            }
+          } catch (e) {
+            // Skip parsing errors
+          }
+        }
+      }
+    }
+
+    // Parse the final accumulated content as JSON
+    return JSON.parse(accumulatedContent);
+  } catch (error) {
+    console.error('Error processing stream:', error);
+    throw error;
+  }
+}
+
 export async function generateWikiPage(params: GenerateWikiParams): Promise<WikiPage> {
-  const { topic, context, relatedPages, parentId, existingPageId } = params;
+  const { topic, context, relatedPages, parentId, existingPageId, onProgress } = params;
 
   const resolvedId = existingPageId ?? generateId(topic);
-
-  // Check cache first
   const cacheKey = getCacheKey('wiki', `${topic}${CACHE_KEY_DELIMITER}${context || ''}`);
-  const cached = getFromCache(cacheKey);
-  if (cached) {
-    return {
-      id: resolvedId,
-      ...cached,
-      createdAt: Date.now(),
-      parentId,
-      isPlaceholder: false
-    };
+
+  // Skip cache when streaming for real-time updates
+  if (!onProgress) {
+    // Check cache first
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      return {
+        id: resolvedId,
+        ...cached,
+        createdAt: Date.now(),
+        parentId,
+        isPlaceholder: false
+      };
+    }
   }
 
   // Optimized, more concise system prompt
@@ -68,6 +133,8 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
     ? `Wiki page: "${topic}"\nContext: ${context}\nRelated: ${relatedPages?.map(p => p.title).join(', ') || 'None'}`
     : `Create a comprehensive wiki page about "${topic}" with overview, key concepts, details, and applications.`;
 
+  const useStreaming = !!onProgress;
+
   try {
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -77,7 +144,7 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        stream: false // Can be set to true for streaming in future enhancement
+        stream: useStreaming
       })
     });
 
@@ -85,7 +152,9 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
       throw new Error('Failed to generate wiki page');
     }
 
-    const data = await response.json();
+    const data = useStreaming
+      ? await handleStreamResponse(response, onProgress)
+      : await response.json();
 
     // Cache the result
     setCache(cacheKey, data);
@@ -117,21 +186,25 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
 }
 
 export async function generateFromSelection(
-  selectedText: string,
-  context: string,
-  currentPage: WikiPage
+  params: GenerateSelectionParams
 ): Promise<WikiPage> {
-  // Check cache first
+  const { selectedText, context, currentPage, onProgress } = params;
+
   const cacheKey = getCacheKey('selection', `${selectedText}${CACHE_KEY_DELIMITER}${currentPage.id}`);
-  const cached = getFromCache(cacheKey);
-  if (cached) {
-    return {
-      id: generateId(selectedText),
-      ...cached,
-      createdAt: Date.now(),
-      parentId: currentPage.id,
-      isPlaceholder: false
-    };
+
+  // Skip cache when streaming for real-time updates
+  if (!onProgress) {
+    // Check cache first
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      return {
+        id: generateId(selectedText),
+        ...cached,
+        createdAt: Date.now(),
+        parentId: currentPage.id,
+        isPlaceholder: false
+      };
+    }
   }
 
   // Optimized, concise system prompt
@@ -149,6 +222,8 @@ Context: "${context}"
 
 Explain "${selectedText}" as it relates to "${currentPage.title}".`;
 
+  const useStreaming = !!onProgress;
+
   try {
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -158,7 +233,7 @@ Explain "${selectedText}" as it relates to "${currentPage.title}".`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        stream: false
+        stream: useStreaming
       })
     });
 
@@ -166,7 +241,9 @@ Explain "${selectedText}" as it relates to "${currentPage.title}".`;
       throw new Error('Failed to generate from selection');
     }
 
-    const data = await response.json();
+    const data = useStreaming
+      ? await handleStreamResponse(response, onProgress)
+      : await response.json();
 
     // Cache the result
     setCache(cacheKey, data);
@@ -194,18 +271,26 @@ Explain "${selectedText}" as it relates to "${currentPage.title}".`;
   }
 }
 
-export async function answerQuestion(question: string, currentPage: WikiPage): Promise<WikiPage> {
-  // Check cache first
+export async function answerQuestion(
+  params: GenerateQuestionParams
+): Promise<WikiPage> {
+  const { question, currentPage, onProgress } = params;
+
   const cacheKey = getCacheKey('question', `${question}${CACHE_KEY_DELIMITER}${currentPage.id}`);
-  const cached = getFromCache(cacheKey);
-  if (cached) {
-    return {
-      id: generateId(question),
-      ...cached,
-      createdAt: Date.now(),
-      parentId: currentPage.id,
-      isPlaceholder: false
-    };
+
+  // Skip cache when streaming for real-time updates
+  if (!onProgress) {
+    // Check cache first
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      return {
+        id: generateId(question),
+        ...cached,
+        createdAt: Date.now(),
+        parentId: currentPage.id,
+        isPlaceholder: false
+      };
+    }
   }
 
   // Optimized, concise system prompt
@@ -222,6 +307,8 @@ Question: ${question}
 
 Answer comprehensively, building on the current topic.`;
 
+  const useStreaming = !!onProgress;
+
   try {
     const response = await fetch('/api/generate', {
       method: 'POST',
@@ -231,7 +318,7 @@ Answer comprehensively, building on the current topic.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        stream: false
+        stream: useStreaming
       })
     });
 
@@ -239,7 +326,9 @@ Answer comprehensively, building on the current topic.`;
       throw new Error('Failed to answer question');
     }
 
-    const data = await response.json();
+    const data = useStreaming
+      ? await handleStreamResponse(response, onProgress)
+      : await response.json();
 
     // Cache the result
     setCache(cacheKey, data);
