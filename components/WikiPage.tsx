@@ -16,7 +16,7 @@ interface WikiPageProps {
   isLoading?: boolean;
   onGenerateFromSelection?: (selectedText: string, context: string) => void | Promise<void>;
   allPages?: WikiPageType[];
-  viewedPageIds?: string[];
+  viewedPageIds?: Set<string>;
 }
 
 export default function WikiPage({
@@ -29,7 +29,7 @@ export default function WikiPage({
   isLoading,
   onGenerateFromSelection,
   allPages = [],
-  viewedPageIds = [],
+  viewedPageIds = new Set(),
 }: WikiPageProps) {
   // Check if this is a generating placeholder (not an error)
   const isGenerating = page.isPlaceholder && page.content.includes('Generating content');
@@ -44,7 +44,7 @@ export default function WikiPage({
       return 'not-generated';
     }
 
-    const isViewed = viewedPageIds.includes(existingPage.id);
+    const isViewed = viewedPageIds.has(existingPage.id);
     return isViewed ? 'viewed' : 'unviewed';
   };
 
