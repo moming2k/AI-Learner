@@ -12,7 +12,7 @@ import Sidebar from '@/components/Sidebar';
 import Toast, { ToastMessage } from '@/components/Toast';
 import Library from '@/components/Library';
 import DatabaseSelector from '@/components/DatabaseSelector';
-import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon } from 'lucide-react';
+import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon, LogOut } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -170,6 +170,22 @@ export default function Home() {
       type: 'success',
       duration: 3000
     });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout error:', error);
+      addToast({
+        title: 'Logout failed',
+        message: 'Please try again',
+        type: 'error',
+        duration: 3000
+      });
+    }
   };
 
   useEffect(() => {
@@ -830,7 +846,18 @@ export default function Home() {
                              transition-all duration-200 hover:shadow-lg"
                   >
                     <LibraryIcon className="w-4 h-4" />
-                    <span>Library</span>
+                    <span className="hidden sm:inline">Library</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg
+                             bg-gray-100 hover:bg-gray-200
+                             text-gray-700 font-medium
+                             transition-all duration-200"
+                    title="Logout"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden md:inline">Logout</span>
                   </button>
                 </div>
               </div>
