@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Create an AbortController for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
     try {
       const response = await fetch(`${apiBaseUrl}/chat/completions`, {
