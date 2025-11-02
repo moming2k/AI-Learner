@@ -857,7 +857,7 @@ export default function Home() {
                     title="Logout"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span className="hidden md:inline">Logout</span>
+                    <span className="hidden sm:inline">Logout</span>
                   </button>
                 </div>
               </div>
