@@ -1,7 +1,7 @@
 'use client';
 
 import { WikiPage as WikiPageType } from '@/lib/types';
-import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
+import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useState, useRef } from 'react';
 import SelectionPopup from './SelectionPopup';
@@ -15,6 +15,8 @@ interface WikiPageProps {
   onRegenerate?: () => void | Promise<void>;
   isLoading?: boolean;
   onGenerateFromSelection?: (selectedText: string, context: string) => void | Promise<void>;
+  allPages?: WikiPageType[];
+  viewedPageIds?: string[];
 }
 
 export default function WikiPage({
@@ -26,10 +28,25 @@ export default function WikiPage({
   onRegenerate,
   isLoading,
   onGenerateFromSelection,
+  allPages = [],
+  viewedPageIds = [],
 }: WikiPageProps) {
   // Check if this is a generating placeholder (not an error)
   const isGenerating = page.isPlaceholder && page.content.includes('Generating content');
   const isError = page.isPlaceholder && page.content.includes('Generation failed');
+
+  // Helper function to check link status
+  const getLinkStatus = (linkText: string): 'viewed' | 'unviewed' | 'not-generated' => {
+    const normalizedLink = linkText.toLowerCase().trim();
+    const existingPage = allPages.find(p => p.title.toLowerCase() === normalizedLink);
+
+    if (!existingPage) {
+      return 'not-generated';
+    }
+
+    const isViewed = viewedPageIds.includes(existingPage.id);
+    return isViewed ? 'viewed' : 'unviewed';
+  };
 
   // Selection popup state
   const [selectionData, setSelectionData] = useState<{
@@ -208,21 +225,37 @@ export default function WikiPage({
         <div className="mb-8">
           <h3 className="text-xl font-semibold mb-4 text-gray-900">Related Topics</h3>
           <div className="flex flex-wrap gap-2">
-            {page.relatedTopics.map((topic, idx) => (
-              <button
-                key={idx}
-                onClick={() => { void onNavigate(topic); }}
-                className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50
-                         border border-blue-200 text-blue-700 font-medium
-                         hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300
-                         transition-all duration-200 flex items-center gap-2
-                         hover:shadow-md"
-                title="Click to explore this topic"
-              >
-                {topic}
-                <ExternalLink className="w-3 h-3" />
-              </button>
-            ))}
+            {page.relatedTopics.map((topic, idx) => {
+              const status = getLinkStatus(topic);
+              return (
+                <button
+                  key={idx}
+                  onClick={() => { void onNavigate(topic); }}
+                  className={`px-4 py-2 rounded-full font-medium
+                           transition-all duration-200 flex items-center gap-2
+                           hover:shadow-md
+                           ${status === 'viewed'
+                             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-400'
+                             : status === 'unviewed'
+                             ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400'
+                             : 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-300 text-purple-700 hover:from-purple-100 hover:to-pink-100 hover:border-purple-400'
+                           }`}
+                  title={
+                    status === 'viewed'
+                      ? 'Already viewed - Click to revisit'
+                      : status === 'unviewed'
+                      ? 'Generated but not viewed yet - Click to explore'
+                      : 'Not generated yet - Click to create'
+                  }
+                >
+                  {status === 'viewed' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {status === 'unviewed' && <Circle className="w-3.5 h-3.5" />}
+                  {status === 'not-generated' && <Sparkles className="w-3.5 h-3.5" />}
+                  <span>{topic}</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -232,22 +265,42 @@ export default function WikiPage({
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
           <h3 className="text-xl font-semibold mb-4 text-gray-900">Explore Further</h3>
           <div className="space-y-3">
-            {page.suggestedQuestions.map((question, idx) => (
-              <button
-                key={idx}
-                onClick={() => { void onNavigate(question); }}
-                className="w-full text-left px-4 py-3 rounded-lg bg-white
-                         border border-indigo-200 text-gray-700
-                         hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
-                         hover:border-blue-300 hover:text-blue-900
-                         transition-all duration-200 flex items-center justify-between
-                         group"
-                title="Click to explore this question"
-              >
-                <span>{question}</span>
-                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-              </button>
-            ))}
+            {page.suggestedQuestions.map((question, idx) => {
+              const status = getLinkStatus(question);
+              return (
+                <button
+                  key={idx}
+                  onClick={() => { void onNavigate(question); }}
+                  className={`w-full text-left px-4 py-3 rounded-lg
+                           transition-all duration-200 flex items-center gap-3
+                           group
+                           ${status === 'viewed'
+                             ? 'bg-white border border-green-300 text-gray-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 hover:border-green-400'
+                             : status === 'unviewed'
+                             ? 'bg-white border border-blue-300 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400'
+                             : 'bg-white border border-purple-300 text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:border-purple-400'
+                           }`}
+                  title={
+                    status === 'viewed'
+                      ? 'Already viewed - Click to revisit'
+                      : status === 'unviewed'
+                      ? 'Generated but not viewed yet - Click to explore'
+                      : 'Not generated yet - Click to create'
+                  }
+                >
+                  <span className="flex-shrink-0">
+                    {status === 'viewed' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                    {status === 'unviewed' && <Circle className="w-4 h-4 text-blue-600" />}
+                    {status === 'not-generated' && <Sparkles className="w-4 h-4 text-purple-600" />}
+                  </span>
+                  <span className="flex-1">{question}</span>
+                  <ExternalLink className={`w-4 h-4 flex-shrink-0 transition-colors
+                                          ${status === 'viewed' ? 'text-green-400 group-hover:text-green-600' :
+                                            status === 'unviewed' ? 'text-blue-400 group-hover:text-blue-600' :
+                                            'text-purple-400 group-hover:text-purple-600'}`} />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

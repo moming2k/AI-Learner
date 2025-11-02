@@ -790,6 +790,8 @@ export default function Home() {
                   onRegenerate={handleRegenerateCurrentPage}
                   isLoading={isLoading}
                   onGenerateFromSelection={handleGenerateFromSelection}
+                  allPages={allPages}
+                  viewedPageIds={session?.pages || []}
                 />
               </>
             )}
@@ -805,6 +807,8 @@ export default function Home() {
             onBookmarkClick={handleNavigateToPage}
             onSearch={handleTopicSearch}
             loadingPages={loadingPages}
+            allPages={allPages}
+            viewedPageIds={session?.pages || []}
           />
         )}
       </div>
