@@ -76,3 +76,11 @@ export interface GenerationJob {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface AuthSession {
+  id: string;
+  invitationCode: string;
+  createdAt: number;
+  lastActiveAt: number;
+  expiresAt: number;
+}
