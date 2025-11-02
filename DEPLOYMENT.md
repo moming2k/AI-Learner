@@ -33,7 +33,7 @@ git push origin main
 1. Visit https://railway.app/new
 2. Click "Deploy from GitHub repo"
 3. Select `moming2k/AI-Learner` repository
-4. Select branch: `claude/invite-only-setup-guide-011CUjYcqicnq5grJ7h6bJvD` (or `main` after merging)
+4. Select branch: `main`
 
 ### 3. Add Persistent Volume for SQLite
 
