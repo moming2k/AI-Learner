@@ -148,7 +148,7 @@ export default function Home() {
 
     setBookmarks(savedBookmarks);
     setAllPages(pages);
-    setViewedPageIds(viewedIds);
+    setViewedPageIds(new Set(viewedIds));
   };
 
   const handleDatabaseChange = async () => {
@@ -157,7 +157,7 @@ export default function Home() {
     setSession(null);
     setBookmarks([]);
     setAllPages([]);
-    setViewedPageIds([]);
+    setViewedPageIds(new Set());
     setLoadingPages(new Set());
     setLoadingTopics(new Set());
 
@@ -171,6 +171,20 @@ export default function Home() {
       duration: 3000
     });
   };
+
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    const success = await storage.recordPageView(pageId);
+
+    if (!success) {
+      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
+    }
+
+    // Update local state to reflect the view (optimistic update)
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
+    }
+  }, [viewedPageIds]);
 
   useEffect(() => {
     loadAllData(true).then(() => setIsInitialized(true));
@@ -216,9 +230,7 @@ export default function Home() {
       loadPageFromUrl();
     } else {
       // No page in URL, clear current page
-      if (!abortController.signal.aborted) {
-        setCurrentPage(null);
-      }
+      setCurrentPage(null);
     }
   }, [searchParams, isInitialized, recordPageView]);
 
@@ -246,20 +258,6 @@ export default function Home() {
     await storage.saveSession(newSession);
     setSession(newSession);
   };
-
-  const recordPageView = useCallback(async (pageId: string) => {
-    // Record the view in the database
-    const success = await storage.recordPageView(pageId);
-    
-    if (!success) {
-      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
-    }
-
-    // Update local state to reflect the view (optimistic update)
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
