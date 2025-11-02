@@ -254,21 +254,20 @@ export function getDbBookmarks(dbName: string = 'default') {
 }
 
 export function getDbMindmap(dbName: string = 'default') {
+  const db = getDatabase(dbName);
+
   return {
     getAll: (): KnowledgeNode[] => {
-      const db = getDatabase(dbName);
       const rows = db.prepare('SELECT * FROM knowledge_nodes').all();
       return rows.map(rowToKnowledgeNode);
     },
 
     getById: (id: string): KnowledgeNode | null => {
-      const db = getDatabase(dbName);
       const row = db.prepare('SELECT * FROM knowledge_nodes WHERE id = ?').get(id);
       return row ? rowToKnowledgeNode(row) : null;
     },
 
     save: (node: KnowledgeNode) => {
-      const db = getDatabase(dbName);
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO knowledge_nodes
         (id, title, children, parent, depth)
@@ -285,8 +284,11 @@ export function getDbMindmap(dbName: string = 'default') {
     },
 
     deleteAll: () => {
-      const db = getDatabase(dbName);
       db.prepare('DELETE FROM knowledge_nodes').run();
+    },
+
+    transaction: <T>(fn: () => T): T => {
+      return db.transaction(fn)();
     }
   };
 }

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Support batch saves for performance optimization
     if (Array.isArray(body.nodes)) {
       try {
-        await dbMindmap.transaction(async () => {
+        dbMindmap.transaction(() => {
           for (const node of body.nodes) {
             if (!node.id || !node.title || node.depth === undefined) {
               throw new Error('Missing required fields in one or more nodes');

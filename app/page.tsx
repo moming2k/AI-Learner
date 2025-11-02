@@ -236,6 +236,8 @@ export default function Home() {
 
     // Poll for completion
     return new Promise((resolve, reject) => {
+      let timeoutId: NodeJS.Timeout;
+
       const pollInterval = setInterval(async () => {
         try {
           const updatedJob = await storage.getJob(job.id);
@@ -266,7 +268,7 @@ export default function Home() {
       }, 1000); // Poll every second
 
       // Set a timeout of 5 minutes
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         clearInterval(pollInterval);
         reject(new Error('Job timeout'));
       }, 5 * 60 * 1000);
