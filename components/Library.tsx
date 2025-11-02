@@ -12,10 +12,10 @@ interface LibraryProps {
   onClose?: () => void;
   onCleanup?: () => void;
   onDeletePage?: (pageId: string) => void;
-  viewedPageIds?: string[];
+  viewedPageIds?: Set<string>;
 }
 
-export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage, viewedPageIds = [] }: LibraryProps) {
+export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage, viewedPageIds = new Set() }: LibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical'>('recent');
@@ -25,7 +25,7 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
 
   // Check if a page has been viewed
   const isPageViewed = (pageId: string): boolean => {
-    return viewedPageIds.includes(pageId);
+    return viewedPageIds.has(pageId);
   };
 
   // Check for duplicates on mount
