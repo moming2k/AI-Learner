@@ -243,17 +243,21 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                   <div
                     key={page.id}
                     className={`relative group p-4 rounded-xl border-2 text-left transition-all cursor-pointer
-                             hover:shadow-lg hover:border-blue-300 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50
+                             hover:shadow-lg
                              ${currentPageId === page.id
-                               ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50'
-                               : 'border-gray-200 bg-white'
+                               ? isViewed
+                                 ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
+                                 : 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-400 hover:from-blue-100 hover:to-indigo-100'
+                               : isViewed
+                               ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-300 hover:from-green-100 hover:to-emerald-100'
+                               : 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100'
                              }`}
                     onClick={() => onPageClick(page.id)}
                   >
                     {/* Viewed Status Badge */}
                     {isViewed && (
                       <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full
-                                   bg-green-100 text-green-700 text-xs font-medium">
+                                   bg-green-600 text-white text-xs font-medium shadow-sm">
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Viewed</span>
                       </div>
@@ -297,10 +301,14 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                   <div
                     key={page.id}
                     className={`relative group w-full p-4 rounded-lg border text-left transition-all cursor-pointer
-                             hover:shadow-md hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
+                             hover:shadow-md
                              ${currentPageId === page.id
-                               ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50'
-                               : 'border-gray-200 bg-white'
+                               ? isViewed
+                                 ? 'border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
+                                 : 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 hover:border-blue-400 hover:from-blue-100 hover:to-indigo-100'
+                               : isViewed
+                               ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-300 hover:from-green-100 hover:to-emerald-100'
+                               : 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100'
                              }`}
                     onClick={() => onPageClick(page.id)}
                   >
@@ -312,7 +320,7 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                           </h3>
                           {isViewed && (
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full
-                                         bg-green-100 text-green-700 text-xs font-medium whitespace-nowrap">
+                                         bg-green-600 text-white text-xs font-medium whitespace-nowrap shadow-sm">
                               <CheckCircle2 className="w-3 h-3" />
                               <span>Viewed</span>
                             </div>
