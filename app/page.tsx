@@ -266,10 +266,8 @@ export default function Home() {
     await storage.recordPageView(pageId);
 
     // Update local state to reflect the view
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
+    setViewedPageIds(prev => prev.has(pageId) ? prev : new Set([...prev, pageId]));
+  }, []);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
