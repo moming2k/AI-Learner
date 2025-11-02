@@ -181,22 +181,39 @@ export default function Home() {
     if (!isInitialized) return;
 
     const pageId = searchParams.get('page');
+    const abortController = new AbortController();
 
     if (pageId) {
       // Load page from URL
       const loadPageFromUrl = async () => {
-        const page = await storage.getPage(pageId);
-        if (page) {
-          setCurrentPage(page);
-          await recordPageView(pageId);
-          // Don't update URL here to avoid infinite loop
+        try {
+          const page = await storage.getPage(pageId);
+          
+          // Check if the effect was cleaned up before updating state
+          if (!abortController.signal.aborted && page) {
+            setCurrentPage(page);
+            await recordPageView(pageId);
+            // Don't update URL here to avoid infinite loop
+          }
+        } catch (error) {
+          // Only log error if not aborted
+          if (!abortController.signal.aborted) {
+            console.error('Error loading page from URL:', error);
+          }
         }
       };
       loadPageFromUrl();
     } else {
       // No page in URL, clear current page
-      setCurrentPage(null);
+      if (!abortController.signal.aborted) {
+        setCurrentPage(null);
+      }
     }
+
+    // Cleanup function to abort async operations
+    return () => {
+      abortController.abort();
+    };
   }, [searchParams, isInitialized]);
 
   // Helper function to navigate with URL update and scroll to top
