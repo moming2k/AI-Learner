@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob } from './types';
 import { getDatabasePath, databaseExists, createDatabase } from './db-manager';
 
 // Cache for database connections
@@ -69,10 +69,23 @@ function initializeDatabase(db: Database.Database) {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS generation_jobs (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      type TEXT NOT NULL,
+      input TEXT NOT NULL,
+      output TEXT,
+      error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_title ON wiki_pages(title);
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON wiki_pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_started ON learning_sessions(started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_bookmarks_timestamp ON bookmarks(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status);
+    CREATE INDEX IF NOT EXISTS idx_jobs_created ON generation_jobs(created_at DESC);
   `);
 }
 
@@ -274,6 +287,82 @@ export function getDbMindmap(dbName: string = 'default') {
 
     deleteAll: () => {
       db.prepare('DELETE FROM knowledge_nodes').run();
+    },
+
+    transaction: <T>(fn: () => T): T => {
+      return db.transaction(fn)();
+    }
+  };
+}
+
+export function getDbJobs(dbName: string = 'default') {
+  return {
+    getAll: (): GenerationJob[] => {
+      const db = getDatabase(dbName);
+      const rows = db.prepare('SELECT * FROM generation_jobs ORDER BY created_at DESC').all();
+      return rows.map(rowToJob);
+    },
+
+    getById: (id: string): GenerationJob | null => {
+      const db = getDatabase(dbName);
+      const row = db.prepare('SELECT * FROM generation_jobs WHERE id = ?').get(id);
+      return row ? rowToJob(row) : null;
+    },
+
+    getPending: (): GenerationJob[] => {
+      const db = getDatabase(dbName);
+      const rows = db.prepare('SELECT * FROM generation_jobs WHERE status = ? ORDER BY created_at ASC').all('pending');
+      return rows.map(rowToJob);
+    },
+
+    save: (job: GenerationJob) => {
+      const db = getDatabase(dbName);
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO generation_jobs
+        (id, status, type, input, output, error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(
+        job.id,
+        job.status,
+        job.type,
+        JSON.stringify(job.input),
+        job.output ? JSON.stringify(job.output) : null,
+        job.error || null,
+        job.createdAt,
+        job.updatedAt
+      );
+    },
+
+    updateStatus: (id: string, status: string, error?: string) => {
+      const db = getDatabase(dbName);
+      const stmt = db.prepare(`
+        UPDATE generation_jobs
+        SET status = ?, error = ?, updated_at = ?
+        WHERE id = ?
+      `);
+      stmt.run(status, error || null, Date.now(), id);
+    },
+
+    updateOutput: (id: string, output: WikiPage) => {
+      const db = getDatabase(dbName);
+      const stmt = db.prepare(`
+        UPDATE generation_jobs
+        SET output = ?, status = ?, updated_at = ?
+        WHERE id = ?
+      `);
+      stmt.run(JSON.stringify(output), 'completed', Date.now(), id);
+    },
+
+    deleteAll: () => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM generation_jobs').run();
+    },
+
+    deleteById: (id: string) => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM generation_jobs WHERE id = ?').run(id);
     }
   };
 }
@@ -321,6 +410,19 @@ function rowToKnowledgeNode(row: any): KnowledgeNode {
   };
 }
 
+function rowToJob(row: any): GenerationJob {
+  return {
+    id: row.id,
+    status: row.status,
+    type: row.type,
+    input: JSON.parse(row.input),
+    output: row.output ? JSON.parse(row.output) : undefined,
+    error: row.error || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export function closeDatabase(dbName?: string) {
   if (dbName) {
     const db = dbConnections.get(dbName);
@@ -342,3 +444,4 @@ export const dbPages = getDbPages();
 export const dbSessions = getDbSessions();
 export const dbBookmarks = getDbBookmarks();
 export const dbMindmap = getDbMindmap();
+export const dbJobs = getDbJobs();
