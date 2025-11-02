@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
 import { generateMindmapNode } from '@/lib/ai-service';
@@ -14,15 +15,19 @@ import DatabaseSelector from '@/components/DatabaseSelector';
 import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon } from 'lucide-react';
 
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState<WikiPageType | null>(null);
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [allPages, setAllPages] = useState<WikiPageType[]>([]);
+  const [viewedPageIds, setViewedPageIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPages, setLoadingPages] = useState<Set<string>>(new Set());
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = Date.now().toString();
@@ -51,11 +56,12 @@ export default function Home() {
 
   const loadAllData = async (showToast: boolean = false) => {
     // Execute all data loading operations in parallel for faster startup
-    const [duplicatesRemoved, savedSession, savedBookmarks, pages] = await Promise.all([
+    const [duplicatesRemoved, savedSession, savedBookmarks, pages, viewedIds] = await Promise.all([
       storage.removeDuplicatePages(),
       storage.getCurrentSession(),
       storage.getBookmarks(),
-      storage.getPages()
+      storage.getPages(),
+      storage.getViewedPageIds()
     ]);
 
     if (duplicatesRemoved > 0 && showToast) {
@@ -142,6 +148,7 @@ export default function Home() {
 
     setBookmarks(savedBookmarks);
     setAllPages(pages);
+    setViewedPageIds(viewedIds);
   };
 
   const handleDatabaseChange = async () => {
@@ -150,6 +157,7 @@ export default function Home() {
     setSession(null);
     setBookmarks([]);
     setAllPages([]);
+    setViewedPageIds([]);
     setLoadingPages(new Set());
     setLoadingTopics(new Set());
 
@@ -165,8 +173,65 @@ export default function Home() {
   };
 
   useEffect(() => {
-    loadAllData(true);
+    loadAllData(true).then(() => setIsInitialized(true));
   }, []);
+
+  // Handle URL changes (back/forward button)
+  // Handle URL changes (back/forward button and navigation)
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const pageId = searchParams.get('page');
+    const pageTitle = searchParams.get('title');
+    const breadcrumbIndex = searchParams.get('breadcrumbIndex');
+
+    if (pageId) {
+      // Load page from URL
+      const loadPageFromUrl = async () => {
+        const page = await storage.getPage(pageId);
+        if (page) {
+          setCurrentPage(page);
+          await recordPageView(pageId);
+          
+          // Handle breadcrumb navigation (trim breadcrumbs)
+          if (breadcrumbIndex !== null && session) {
+            const index = parseInt(breadcrumbIndex, 10);
+            if (!isNaN(index) && index >= 0) {
+              const updatedSession = {
+                ...session,
+                currentPageId: pageId,
+                breadcrumbs: session.breadcrumbs.slice(0, index + 1)
+              };
+              await storage.saveSession(updatedSession);
+              setSession(updatedSession);
+              return; // Skip normal session update
+            }
+          }
+          
+          // Normal navigation: update session with actual page title
+          const title = page.title || pageTitle || 'Untitled';
+          await updateSession(pageId, title);
+        }
+      };
+      loadPageFromUrl();
+    } else {
+      // No page in URL, clear current page
+      if (!abortController.signal.aborted) {
+        setCurrentPage(null);
+      }
+    }
+  }, [searchParams, isInitialized, recordPageView]);
+
+  // Helper function to navigate with URL update and scroll to top
+  const navigateToPageWithHistory = (pageId: string, pageTitle: string) => {
+    // Update URL for browser history - include title for session updates
+    router.push(`?page=${encodeURIComponent(pageId)}&title=${encodeURIComponent(pageTitle)}`, { scroll: false });
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Note: Page loading, view recording, and session update happen in useEffect above
+  };
 
   const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
     const newSession: LearningSession = {
@@ -181,6 +246,20 @@ export default function Home() {
     await storage.saveSession(newSession);
     setSession(newSession);
   };
+
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    const success = await storage.recordPageView(pageId);
+    
+    if (!success) {
+      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
+    }
+
+    // Update local state to reflect the view (optimistic update)
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
+    }
+  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
@@ -292,8 +371,7 @@ export default function Home() {
     // If page exists, navigate immediately (only if navigateAfter is true)
     if (shouldNavigateExisting) {
       if (navigateAfter) {
-        setCurrentPage(exactMatch);
-        await updateSession(exactMatch.id, exactMatch.title);
+        navigateToPageWithHistory(exactMatch.id, exactMatch.title);
         addToast({
           title: 'Page found',
           message: `"${exactMatch.title}" already exists`,
@@ -379,9 +457,8 @@ export default function Home() {
       });
 
       if (navigateAfter) {
-        // Update the placeholder page with real content
-        setCurrentPage(page);
-        await updateSession(page.id, page.title);
+        // Navigate to the generated page
+        navigateToPageWithHistory(page.id, page.title);
       }
 
       return page;
@@ -464,8 +541,7 @@ export default function Home() {
       );
 
       if (similarPage) {
-        setCurrentPage(similarPage);
-        await updateSession(similarPage.id, similarPage.title);
+        navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -510,9 +586,8 @@ export default function Home() {
         duration: 5000
       });
 
-      // Update placeholder with real content
-      setCurrentPage(answerPage);
-      await updateSession(answerPage.id, answerPage.title);
+      // Navigate to the generated answer page
+      navigateToPageWithHistory(answerPage.id, answerPage.title);
     } catch (error) {
       console.error('Error asking question:', error);
 
@@ -601,8 +676,7 @@ export default function Home() {
       );
 
       if (similarPage && !similarPage.isPlaceholder) {
-        setCurrentPage(similarPage);
-        await updateSession(similarPage.id, similarPage.title);
+        navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -646,9 +720,8 @@ export default function Home() {
         duration: 5000
       });
 
-      // Update placeholder with real content
-      setCurrentPage(newPage);
-      await updateSession(newPage.id, newPage.title);
+      // Navigate to the generated page
+      navigateToPageWithHistory(newPage.id, newPage.title);
     } catch (error) {
       console.error('Error generating from selection:', error);
 
@@ -681,29 +754,24 @@ export default function Home() {
   const handleNavigateToPage = async (pageId: string) => {
     const page = await storage.getPage(pageId);
     if (page) {
-      setCurrentPage(page);
-
       // Check if this page is in the current breadcrumbs
       if (session) {
         const breadcrumbIndex = session.breadcrumbs.findIndex(b => b.id === pageId);
 
         if (breadcrumbIndex >= 0) {
-          // Trim breadcrumbs to this point (going back in history)
-          const updatedSession = {
-            ...session,
-            currentPageId: pageId,
-            breadcrumbs: session.breadcrumbs.slice(0, breadcrumbIndex + 1)
-          };
-          await storage.saveSession(updatedSession);
-          setSession(updatedSession);
+          // Breadcrumb navigation - include index to trim breadcrumbs
+          router.push(`?page=${encodeURIComponent(pageId)}&title=${encodeURIComponent(page.title)}&breadcrumbIndex=${breadcrumbIndex}`, { scroll: false });
         } else {
-          // Not in breadcrumbs, add it normally
-          await updateSession(page.id, page.title);
+          // Normal navigation - not in breadcrumbs, add it normally
+          navigateToPageWithHistory(page.id, page.title);
         }
       } else {
-        // No session, create one
-        await updateSession(page.id, page.title);
+        // No session, use normal navigation
+        navigateToPageWithHistory(page.id, page.title);
       }
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -739,7 +807,10 @@ export default function Home() {
                   )}
                   {currentPage && (
                     <button
-                      onClick={() => setCurrentPage(null)}
+                      onClick={() => {
+                        setCurrentPage(null);
+                        router.push('/');
+                      }}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg
                                bg-gradient-to-r from-gray-500 to-gray-600
                                text-white font-medium hover:from-gray-600 hover:to-gray-700
@@ -790,6 +861,8 @@ export default function Home() {
                   onRegenerate={handleRegenerateCurrentPage}
                   isLoading={isLoading}
                   onGenerateFromSelection={handleGenerateFromSelection}
+                  allPages={allPages}
+                  viewedPageIds={viewedPageIds}
                 />
               </>
             )}
@@ -805,6 +878,8 @@ export default function Home() {
             onBookmarkClick={handleNavigateToPage}
             onSearch={handleTopicSearch}
             loadingPages={loadingPages}
+            allPages={allPages}
+            viewedPageIds={viewedPageIds}
           />
         )}
       </div>
@@ -815,8 +890,7 @@ export default function Home() {
           onPageClick={async (pageId) => {
             const page = await storage.getPage(pageId);
             if (page) {
-              setCurrentPage(page);
-              await updateSession(page.id, page.title);
+              navigateToPageWithHistory(page.id, page.title);
               setShowLibrary(false);
             }
           }}
@@ -865,6 +939,7 @@ export default function Home() {
               }
             }
           }}
+          viewedPageIds={viewedPageIds}
         />
       )}
 
