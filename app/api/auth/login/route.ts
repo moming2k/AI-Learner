@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidInvitationCode, createAuthSession } from '@/lib/auth';
 import { dbAuthSessions } from '@/lib/db';
+import { sessionCache } from '@/lib/session-cache';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
     // Create session
     const session = createAuthSession(invitationCode);
     dbAuthSessions.create(session);
+    
+    // Add session to cache for immediate availability
+    sessionCache.set(session.id, session);
 
     // Clean up expired sessions
     dbAuthSessions.deleteExpired();
