@@ -176,16 +176,7 @@ export default function Home() {
     loadAllData(true).then(() => setIsInitialized(true));
   }, []);
 
-  const recordPageView = useCallback(async (pageId: string) => {
-    // Record the view in the database
-    await storage.recordPageView(pageId);
-
-    // Update local state to reflect the view
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
-
+  // Handle URL changes (back/forward button)
   // Handle URL changes (back/forward button and navigation)
   useEffect(() => {
     if (!isInitialized) return;
@@ -193,43 +184,33 @@ export default function Home() {
     const pageId = searchParams.get('page');
     const pageTitle = searchParams.get('title');
     const breadcrumbIndex = searchParams.get('breadcrumbIndex');
-    const abortController = new AbortController();
 
     if (pageId) {
       // Load page from URL
       const loadPageFromUrl = async () => {
-        try {
-          const page = await storage.getPage(pageId);
+        const page = await storage.getPage(pageId);
+        if (page) {
+          setCurrentPage(page);
+          await recordPageView(pageId);
           
-          // Check if the effect was cleaned up before updating state
-          if (!abortController.signal.aborted && page) {
-            setCurrentPage(page);
-            await recordPageView(pageId);
-            
-            // Handle breadcrumb navigation (trim breadcrumbs)
-            if (breadcrumbIndex !== null && session) {
-              const index = parseInt(breadcrumbIndex, 10);
-              if (!isNaN(index) && index >= 0) {
-                const updatedSession = {
-                  ...session,
-                  currentPageId: pageId,
-                  breadcrumbs: session.breadcrumbs.slice(0, index + 1)
-                };
-                await storage.saveSession(updatedSession);
-                setSession(updatedSession);
-                return; // Skip normal session update
-              }
+          // Handle breadcrumb navigation (trim breadcrumbs)
+          if (breadcrumbIndex !== null && session) {
+            const index = parseInt(breadcrumbIndex, 10);
+            if (!isNaN(index) && index >= 0) {
+              const updatedSession = {
+                ...session,
+                currentPageId: pageId,
+                breadcrumbs: session.breadcrumbs.slice(0, index + 1)
+              };
+              await storage.saveSession(updatedSession);
+              setSession(updatedSession);
+              return; // Skip normal session update
             }
-            
-            // Normal navigation: update session with actual page title
-            const title = page.title || pageTitle || 'Untitled';
-            await updateSession(pageId, title);
           }
-        } catch (error) {
-          // Only log error if not aborted
-          if (!abortController.signal.aborted) {
-            console.error('Error loading page from URL:', error);
-          }
+          
+          // Normal navigation: update session with actual page title
+          const title = page.title || pageTitle || 'Untitled';
+          await updateSession(pageId, title);
         }
       };
       loadPageFromUrl();
@@ -239,11 +220,6 @@ export default function Home() {
         setCurrentPage(null);
       }
     }
-
-    // Cleanup function to abort async operations
-    return () => {
-      abortController.abort();
-    };
   }, [searchParams, isInitialized, recordPageView]);
 
   // Helper function to navigate with URL update and scroll to top
@@ -270,6 +246,20 @@ export default function Home() {
     await storage.saveSession(newSession);
     setSession(newSession);
   };
+
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    const success = await storage.recordPageView(pageId);
+    
+    if (!success) {
+      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
+    }
+
+    // Update local state to reflect the view (optimistic update)
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
+    }
+  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
