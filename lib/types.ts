@@ -46,3 +46,26 @@ export interface ResearchCollection {
   shareCode?: string; // For sharing collections
   thumbnail?: string; // Preview image or emoji
 }
+
+export type GenerationJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type GenerationJobType = 'wiki_page' | 'question' | 'selection';
+
+export interface GenerationJobInput {
+  topic?: string;
+  question?: string;
+  currentPageContent?: string;
+  selectedText?: string;
+  context?: string;
+  parentId?: string;
+}
+
+export interface GenerationJob {
+  id: string;
+  status: GenerationJobStatus;
+  type: GenerationJobType;
+  input: GenerationJobInput;
+  output?: WikiPage;
+  error?: string;
+  createdAt: number;
+  updatedAt: number;
+}
