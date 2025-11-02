@@ -227,9 +227,13 @@ export default function Home() {
 
   const recordPageView = async (pageId: string) => {
     // Record the view in the database
-    await storage.recordPageView(pageId);
+    const success = await storage.recordPageView(pageId);
+    
+    if (!success) {
+      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
+    }
 
-    // Update local state to reflect the view
+    // Update local state to reflect the view (optimistic update)
     if (!viewedPageIds.includes(pageId)) {
       setViewedPageIds(prev => [...prev, pageId]);
     }

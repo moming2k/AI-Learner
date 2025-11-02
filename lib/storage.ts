@@ -408,17 +408,22 @@ export const storage = {
     }
   },
 
-  recordPageView: async (pageId: string): Promise<void> => {
+  recordPageView: async (pageId: string): Promise<boolean> => {
     try {
       const response = await fetch('/api/page-views', {
         method: 'POST',
         headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ pageId })
       });
-      if (!response.ok) throw new Error('Failed to record page view');
+      if (!response.ok) {
+        console.error('Failed to record page view:', response.statusText);
+        return false;
+      }
+      return true;
     } catch (error) {
       console.error('Error recording page view:', error);
       // Don't throw - we don't want to break navigation if view tracking fails
+      return false;
     }
   },
 };
