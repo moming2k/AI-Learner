@@ -67,9 +67,14 @@ export function getStatusWhiteBackgroundClasses(status: LinkStatus): string {
 /**
  * Get icon color classes for external link icon
  */
+const STATUS_ICON_COLORS: Record<LinkStatus, string> = {
+  viewed: 'text-green-400 group-hover:text-green-600',
+  unviewed: 'text-blue-400 group-hover:text-blue-600',
+  'not-generated': 'text-purple-400 group-hover:text-purple-600'
+};
+
 export function getStatusIconColor(status: LinkStatus): string {
-  const color = status === 'viewed' ? 'green' : status === 'unviewed' ? 'blue' : 'purple';
-  return `text-${color}-400 group-hover:text-${color}-600`;
+  return STATUS_ICON_COLORS[status];
 }
 
 /**
