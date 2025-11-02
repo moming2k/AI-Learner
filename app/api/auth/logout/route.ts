@@ -16,10 +16,10 @@ export async function POST(request: NextRequest) {
       sessionCache.delete(sessionId);
 
       // Clear cookie
-      cookieStore.delete('ai-learner-session');
-    }
-
-    return NextResponse.json({ success: true });
+      // Delete cookie on response so client removes it
+      const response = NextResponse.json({ success: true });
+      response.cookies.delete('ai-learner-session');
+      return response;
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(
