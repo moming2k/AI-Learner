@@ -216,7 +216,9 @@ export default function Home() {
       loadPageFromUrl();
     } else {
       // No page in URL, clear current page
-      setCurrentPage(null);
+      if (!abortController.signal.aborted) {
+        setCurrentPage(null);
+      }
     }
   }, [searchParams, isInitialized, recordPageView]);
 
