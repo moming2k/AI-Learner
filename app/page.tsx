@@ -21,7 +21,7 @@ export default function Home() {
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [allPages, setAllPages] = useState<WikiPageType[]>([]);
-  const [viewedPageIds, setViewedPageIds] = useState<string[]>([]);
+  const [viewedPageIds, setViewedPageIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPages, setLoadingPages] = useState<Set<string>>(new Set());
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
@@ -230,8 +230,8 @@ export default function Home() {
     await storage.recordPageView(pageId);
 
     // Update local state to reflect the view
-    if (!viewedPageIds.includes(pageId)) {
-      setViewedPageIds(prev => [...prev, pageId]);
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
     }
   };
 
