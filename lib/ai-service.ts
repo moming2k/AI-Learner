@@ -69,7 +69,13 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
     : `Create a comprehensive wiki page about "${topic}" with overview, key concepts, details, and applications.`;
 
   try {
-    const response = await fetch('/api/generate', {
+    // Construct absolute URL for server-side fetch
+    const baseUrl = typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      : '';
+    const apiUrl = `${baseUrl}/api/generate`;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -150,7 +156,13 @@ Context: "${context}"
 Explain "${selectedText}" as it relates to "${currentPage.title}".`;
 
   try {
-    const response = await fetch('/api/generate', {
+    // Construct absolute URL for server-side fetch
+    const baseUrl = typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      : '';
+    const apiUrl = `${baseUrl}/api/generate`;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -223,7 +235,13 @@ Question: ${question}
 Answer comprehensively, building on the current topic.`;
 
   try {
-    const response = await fetch('/api/generate', {
+    // Construct absolute URL for server-side fetch
+    const baseUrl = typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      : '';
+    const apiUrl = `${baseUrl}/api/generate`;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

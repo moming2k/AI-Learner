@@ -33,6 +33,13 @@ export interface Bookmark {
   timestamp: number;
 }
 
+export interface PageView {
+  pageId: string;
+  firstViewedAt: number;
+  lastViewedAt: number;
+  viewCount: number;
+}
+
 export interface ResearchCollection {
   id: string;
   name: string;
