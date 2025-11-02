@@ -5,6 +5,7 @@ import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle, Ch
 import ReactMarkdown from 'react-markdown';
 import { useState, useRef } from 'react';
 import SelectionPopup from './SelectionPopup';
+import { getStatusGradientWithHoverBorder, getStatusWhiteBackgroundClasses, getStatusIconColor, getStatusTitle, type LinkStatus } from '@/lib/status-styles';
 
 interface WikiPageProps {
   page: WikiPageType;
@@ -234,19 +235,8 @@ export default function WikiPage({
                   className={`px-4 py-2 rounded-full font-medium
                            transition-all duration-200 flex items-center gap-2
                            hover:shadow-md
-                           ${status === 'viewed'
-                             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-400'
-                             : status === 'unviewed'
-                             ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400'
-                             : 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-300 text-purple-700 hover:from-purple-100 hover:to-pink-100 hover:border-purple-400'
-                           }`}
-                  title={
-                    status === 'viewed'
-                      ? 'Already viewed - Click to revisit'
-                      : status === 'unviewed'
-                      ? 'Generated but not viewed yet - Click to explore'
-                      : 'Not generated yet - Click to create'
-                  }
+                           ${getStatusGradientWithHoverBorder(status)}`}
+                  title={getStatusTitle(status)}
                 >
                   {status === 'viewed' && <CheckCircle2 className="w-3.5 h-3.5" />}
                   {status === 'unviewed' && <Circle className="w-3.5 h-3.5" />}
@@ -274,19 +264,8 @@ export default function WikiPage({
                   className={`w-full text-left px-4 py-3 rounded-lg
                            transition-all duration-200 flex items-center gap-3
                            group
-                           ${status === 'viewed'
-                             ? 'bg-white border border-green-300 text-gray-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 hover:border-green-400'
-                             : status === 'unviewed'
-                             ? 'bg-white border border-blue-300 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:border-blue-400'
-                             : 'bg-white border border-purple-300 text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:border-purple-400'
-                           }`}
-                  title={
-                    status === 'viewed'
-                      ? 'Already viewed - Click to revisit'
-                      : status === 'unviewed'
-                      ? 'Generated but not viewed yet - Click to explore'
-                      : 'Not generated yet - Click to create'
-                  }
+                           ${getStatusWhiteBackgroundClasses(status)}`}
+                  title={getStatusTitle(status)}
                 >
                   <span className="flex-shrink-0">
                     {status === 'viewed' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
@@ -294,10 +273,7 @@ export default function WikiPage({
                     {status === 'not-generated' && <Sparkles className="w-4 h-4 text-purple-600" />}
                   </span>
                   <span className="flex-1">{question}</span>
-                  <ExternalLink className={`w-4 h-4 flex-shrink-0 transition-colors
-                                          ${status === 'viewed' ? 'text-green-400 group-hover:text-green-600' :
-                                            status === 'unviewed' ? 'text-blue-400 group-hover:text-blue-600' :
-                                            'text-purple-400 group-hover:text-purple-600'}`} />
+                  <ExternalLink className={`w-4 h-4 flex-shrink-0 transition-colors ${getStatusIconColor(status)}`} />
                 </button>
               );
             })}
