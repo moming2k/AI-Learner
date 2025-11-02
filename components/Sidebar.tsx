@@ -1,7 +1,7 @@
 'use client';
 
 import { WikiPage, Bookmark, LearningSession } from '@/lib/types';
-import { BookOpen, Bookmark as BookmarkIcon, History, Search, ChevronRight, X, Loader2 } from 'lucide-react';
+import { BookOpen, Bookmark as BookmarkIcon, History, Search, ChevronRight, X, Loader2, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 interface SidebarProps {
@@ -12,6 +12,8 @@ interface SidebarProps {
   onBookmarkClick: (pageId: string) => void | Promise<void>;
   onSearch: (query: string) => void | Promise<void | unknown>;
   loadingPages?: Set<string>; // Track which pages are being generated
+  allPages?: WikiPage[];
+  viewedPageIds?: string[];
 }
 
 export default function Sidebar({
@@ -21,10 +23,25 @@ export default function Sidebar({
   onNavigate,
   onBookmarkClick,
   onSearch,
-  loadingPages = new Set()
+  loadingPages = new Set(),
+  allPages = [],
+  viewedPageIds = []
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Helper function to check link status
+  const getLinkStatus = (linkText: string): 'viewed' | 'unviewed' | 'not-generated' => {
+    const normalizedLink = linkText.toLowerCase().trim();
+    const existingPage = allPages.find(p => p.title.toLowerCase() === normalizedLink);
+
+    if (!existingPage) {
+      return 'not-generated';
+    }
+
+    const isViewed = viewedPageIds.includes(existingPage.id);
+    return isViewed ? 'viewed' : 'unviewed';
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,20 +166,35 @@ export default function Sidebar({
                 Related Topics
               </h3>
               <div className="space-y-2">
-                {currentPage.relatedTopics.map((topic, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => { void onSearch(topic); }}
-                    className="w-full text-left px-3 py-2 rounded-lg text-sm
-                             bg-gradient-to-r from-gray-50 to-gray-100
-                             border border-gray-200
-                             hover:from-blue-50 hover:to-indigo-50
-                             hover:border-blue-300
-                             transition-all text-gray-700"
-                  >
-                    {topic}
-                  </button>
-                ))}
+                {currentPage.relatedTopics.map((topic, idx) => {
+                  const status = getLinkStatus(topic);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => { void onSearch(topic); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm
+                               transition-all flex items-center gap-2
+                               ${status === 'viewed'
+                                 ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-400'
+                                 : status === 'unviewed'
+                                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400'
+                                 : 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-300 text-purple-700 hover:from-purple-100 hover:to-pink-100 hover:border-purple-400'
+                               }`}
+                      title={
+                        status === 'viewed'
+                          ? 'Already viewed'
+                          : status === 'unviewed'
+                          ? 'Generated but not viewed'
+                          : 'Not generated yet'
+                      }
+                    >
+                      {status === 'viewed' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {status === 'unviewed' && <Circle className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {status === 'not-generated' && <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />}
+                      <span className="truncate">{topic}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
