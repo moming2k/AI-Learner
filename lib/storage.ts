@@ -1,6 +1,6 @@
 'use client';
 
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, GenerationJobType, GenerationJobInput } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, GenerationJobType, GenerationJobInput, PageView } from './types';
 
 const DB_STORAGE_KEY = 'selectedDatabase';
 const DB_HEADER_NAME = 'x-database-name';
@@ -364,6 +364,61 @@ export const storage = {
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
+    }
+  },
+
+  // Page Views
+  getPageViews: async (): Promise<PageView[]> => {
+    try {
+      const response = await fetch('/api/page-views', {
+        headers: getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch page views');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching page views:', error);
+      return [];
+    }
+  },
+
+  getPageView: async (pageId: string): Promise<PageView | null> => {
+    try {
+      const response = await fetch(`/api/page-views?pageId=${pageId}`, {
+        headers: getHeaders()
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error('Failed to fetch page view');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching page view:', error);
+      return null;
+    }
+  },
+
+  getViewedPageIds: async (): Promise<string[]> => {
+    try {
+      const response = await fetch('/api/page-views?idsOnly=true', {
+        headers: getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch viewed page IDs');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching viewed page IDs:', error);
+      return [];
+    }
+  },
+
+  recordPageView: async (pageId: string): Promise<void> => {
+    try {
+      const response = await fetch('/api/page-views', {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ pageId })
+      });
+      if (!response.ok) throw new Error('Failed to record page view');
+    } catch (error) {
+      console.error('Error recording page view:', error);
+      // Don't throw - we don't want to break navigation if view tracking fails
     }
   },
 };
