@@ -13,7 +13,7 @@ interface SidebarProps {
   onSearch: (query: string) => void | Promise<void | unknown>;
   loadingPages?: Set<string>; // Track which pages are being generated
   allPages?: WikiPage[];
-  viewedPageIds?: string[];
+  viewedPageIds?: Set<string>;
 }
 
 export default function Sidebar({
@@ -25,7 +25,7 @@ export default function Sidebar({
   onSearch,
   loadingPages = new Set(),
   allPages = [],
-  viewedPageIds = []
+  viewedPageIds = new Set()
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,7 +39,7 @@ export default function Sidebar({
       return 'not-generated';
     }
 
-    const isViewed = viewedPageIds.includes(existingPage.id);
+    const isViewed = viewedPageIds.has(existingPage.id);
     return isViewed ? 'viewed' : 'unviewed';
   };
 
