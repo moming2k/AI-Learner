@@ -6,9 +6,13 @@ import {
   getDatabaseInfo,
   type DatabaseInfo
 } from '@/lib/db-manager';
+import { checkAuth } from '@/lib/auth-guard';
 
 // GET /api/databases - List all databases with their info
 export async function GET() {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbNames = listDatabases();
     const databases: DatabaseInfo[] = [];
@@ -32,6 +36,9 @@ export async function GET() {
 
 // POST /api/databases - Create a new database
 export async function POST(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { name } = body;
@@ -73,6 +80,9 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/databases?name=xxx - Delete a database
 export async function DELETE(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const name = searchParams.get('name');

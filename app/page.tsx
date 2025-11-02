@@ -28,6 +28,8 @@ export default function Home() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = Date.now().toString();
@@ -148,7 +150,7 @@ export default function Home() {
 
     setBookmarks(savedBookmarks);
     setAllPages(pages);
-    setViewedPageIds(viewedIds);
+    setViewedPageIds(new Set(viewedIds));
   };
 
   const handleDatabaseChange = async () => {
@@ -157,7 +159,7 @@ export default function Home() {
     setSession(null);
     setBookmarks([]);
     setAllPages([]);
-    setViewedPageIds([]);
+    setViewedPageIds(new Set());
     setLoadingPages(new Set());
     setLoadingTopics(new Set());
 
@@ -188,9 +190,54 @@ export default function Home() {
     }
   };
 
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    const success = await storage.recordPageView(pageId);
+
+    if (!success) {
+      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
+    }
+
+    // Update local state to reflect the view (optimistic update)
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
+    }
+  }, [viewedPageIds]);
+
+  // Check authentication on mount
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/check');
+
+        // If we get 401, user is not authenticated and auth is required
+        if (response.status === 401) {
+          router.push('/login');
+          return;
+        }
+
+        const data = await response.json();
+
+        // Either auth is not required, or user is authenticated
+        setIsAuthenticated(data.authenticated);
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        // On error, allow access (fail open in development)
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  useEffect(() => {
+    // Only load data after auth check is complete
+    if (isCheckingAuth) return;
+
     loadAllData(true).then(() => setIsInitialized(true));
-  }, []);
+  }, [isCheckingAuth]);
 
   // Handle URL changes (back/forward button)
   // Handle URL changes (back/forward button and navigation)
@@ -232,9 +279,7 @@ export default function Home() {
       loadPageFromUrl();
     } else {
       // No page in URL, clear current page
-      if (!abortController.signal.aborted) {
-        setCurrentPage(null);
-      }
+      setCurrentPage(null);
     }
   }, [searchParams, isInitialized, recordPageView]);
 
@@ -262,20 +307,6 @@ export default function Home() {
     await storage.saveSession(newSession);
     setSession(newSession);
   };
-
-  const recordPageView = useCallback(async (pageId: string) => {
-    // Record the view in the database
-    const success = await storage.recordPageView(pageId);
-    
-    if (!success) {
-      console.warn(`Failed to record page view for page ${pageId} - view tracking may be incomplete`);
-    }
-
-    // Update local state to reflect the view (optimistic update)
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
@@ -792,6 +823,18 @@ export default function Home() {
   };
 
   const isBookmarked = currentPage ? bookmarks.some(b => b.pageId === currentPage.id) : false;
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+          <p className="text-gray-600 font-medium">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">

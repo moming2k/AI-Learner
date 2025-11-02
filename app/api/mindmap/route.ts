@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbMindmap } from '@/lib/db';
 import { getDatabaseName } from '@/lib/db-utils';
 import { KnowledgeNode } from '@/lib/types';
+import { checkAuth } from '@/lib/auth-guard';
 
 export async function GET(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbMindmap = getDbMindmap(dbName);
@@ -29,6 +33,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbMindmap = getDbMindmap(dbName);
@@ -74,6 +81,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbMindmap = getDbMindmap(dbName);
