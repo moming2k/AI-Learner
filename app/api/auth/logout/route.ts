@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       // Delete session from database
       dbAuthSessions.delete(sessionId);
-      
+
       // Remove session from cache
       sessionCache.delete(sessionId);
 
@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({ success: true });
       response.cookies.delete('ai-learner-session');
       return response;
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(

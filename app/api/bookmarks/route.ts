@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbBookmarks } from '@/lib/db';
 import { getDatabaseName } from '@/lib/db-utils';
 import { Bookmark } from '@/lib/types';
+import { checkAuth } from '@/lib/auth-guard';
 
 export async function GET(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
@@ -17,6 +21,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
@@ -39,6 +46,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
     const dbName = getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
