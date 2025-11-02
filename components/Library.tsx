@@ -4,6 +4,7 @@ import { WikiPage } from '@/lib/types';
 import { storage } from '@/lib/storage';
 import { BookOpen, Clock, Search, Grid, List, X, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
+import { getLibraryGridCardClasses, getLibraryListCardClasses } from '@/lib/status-styles';
 
 interface LibraryProps {
   pages: WikiPage[];
@@ -12,10 +13,10 @@ interface LibraryProps {
   onClose?: () => void;
   onCleanup?: () => void;
   onDeletePage?: (pageId: string) => void;
-  viewedPageIds?: string[];
+  viewedPageIds?: Set<string>;
 }
 
-export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage, viewedPageIds = [] }: LibraryProps) {
+export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage, viewedPageIds = new Set() }: LibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical'>('recent');
@@ -25,7 +26,7 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
 
   // Check if a page has been viewed
   const isPageViewed = (pageId: string): boolean => {
-    return viewedPageIds.includes(pageId);
+    return viewedPageIds.has(pageId);
   };
 
   // Check for duplicates on mount
@@ -244,14 +245,7 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                     key={page.id}
                     className={`relative group p-4 rounded-xl border-2 text-left transition-all cursor-pointer
                              hover:shadow-lg
-                             ${currentPageId === page.id
-                               ? isViewed
-                                 ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
-                                 : 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-400 hover:from-blue-100 hover:to-indigo-100'
-                               : isViewed
-                               ? 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-300 hover:from-green-100 hover:to-emerald-100'
-                               : 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100'
-                             }`}
+                             ${getLibraryGridCardClasses(isViewed, currentPageId === page.id)}`}
                     onClick={() => onPageClick(page.id)}
                   >
                     {/* Viewed Status Badge */}
@@ -302,14 +296,7 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                     key={page.id}
                     className={`relative group w-full p-4 rounded-lg border text-left transition-all cursor-pointer
                              hover:shadow-md
-                             ${currentPageId === page.id
-                               ? isViewed
-                                 ? 'border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-400 hover:from-green-100 hover:to-emerald-100'
-                                 : 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 hover:border-blue-400 hover:from-blue-100 hover:to-indigo-100'
-                               : isViewed
-                               ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:border-green-300 hover:from-green-100 hover:to-emerald-100'
-                               : 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 hover:border-blue-300 hover:from-blue-100 hover:to-indigo-100'
-                             }`}
+                             ${getLibraryListCardClasses(isViewed, currentPageId === page.id)}`}
                     onClick={() => onPageClick(page.id)}
                   >
                     <div className="flex items-start justify-between">
