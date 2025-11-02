@@ -3,6 +3,7 @@
 import { WikiPage, Bookmark, LearningSession } from '@/lib/types';
 import { BookOpen, Bookmark as BookmarkIcon, History, Search, ChevronRight, X, Loader2, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { getStatusGradientWithHoverBorder, getStatusTitle, type LinkStatus } from '@/lib/status-styles';
 
 interface SidebarProps {
   currentPage: WikiPage | null;
@@ -13,7 +14,7 @@ interface SidebarProps {
   onSearch: (query: string) => void | Promise<void | unknown>;
   loadingPages?: Set<string>; // Track which pages are being generated
   allPages?: WikiPage[];
-  viewedPageIds?: string[];
+  viewedPageIds?: Set<string>;
 }
 
 export default function Sidebar({
@@ -25,7 +26,7 @@ export default function Sidebar({
   onSearch,
   loadingPages = new Set(),
   allPages = [],
-  viewedPageIds = []
+  viewedPageIds = new Set()
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,7 +40,7 @@ export default function Sidebar({
       return 'not-generated';
     }
 
-    const isViewed = viewedPageIds.includes(existingPage.id);
+    const isViewed = viewedPageIds.has(existingPage.id);
     return isViewed ? 'viewed' : 'unviewed';
   };
 
@@ -174,19 +175,8 @@ export default function Sidebar({
                       onClick={() => { void onSearch(topic); }}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm
                                transition-all flex items-center gap-2
-                               ${status === 'viewed'
-                                 ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-700 hover:from-green-100 hover:to-emerald-100 hover:border-green-400'
-                                 : status === 'unviewed'
-                                 ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400'
-                                 : 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-300 text-purple-700 hover:from-purple-100 hover:to-pink-100 hover:border-purple-400'
-                               }`}
-                      title={
-                        status === 'viewed'
-                          ? 'Already viewed'
-                          : status === 'unviewed'
-                          ? 'Generated but not viewed'
-                          : 'Not generated yet'
-                      }
+                               ${getStatusGradientWithHoverBorder(status)}`}
+                      title={getStatusTitle(status, 'short')}
                     >
                       {status === 'viewed' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />}
                       {status === 'unviewed' && <Circle className="w-3.5 h-3.5 flex-shrink-0" />}
