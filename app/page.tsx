@@ -172,6 +172,79 @@ export default function Home() {
     });
   };
 
+  const createNewSession = useCallback(async (firstPageId: string, firstPageTitle: string) => {
+    const newSession: LearningSession = {
+      id: 'session-' + Date.now(),
+      name: `Learning: ${firstPageTitle}`,
+      startedAt: Date.now(),
+      pages: [firstPageId],
+      currentPageId: firstPageId,
+      breadcrumbs: [{ id: firstPageId, title: firstPageTitle }]
+    };
+
+    await storage.saveSession(newSession);
+    setSession(newSession);
+  }, []);
+
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    await storage.recordPageView(pageId);
+
+    // Update local state to reflect the view using functional update
+    setViewedPageIds(prev => {
+      if (prev.has(pageId)) {
+        return prev;
+      }
+      return new Set([...prev, pageId]);
+    });
+  }, []); // No dependencies needed with functional update
+
+  const updateSession = useCallback(async (pageId: string, pageTitle: string) => {
+    // Use functional update to get current session without dependency
+    let shouldCreateNew = false;
+    
+    setSession(prevSession => {
+      if (!prevSession) {
+        shouldCreateNew = true;
+        return prevSession; // createNewSession will be called below
+      }
+
+      const lastBreadcrumb = prevSession.breadcrumbs[prevSession.breadcrumbs.length - 1];
+
+      // Check if the last breadcrumb is a temporary loading placeholder that should be replaced
+      const isReplacingPlaceholder = lastBreadcrumb &&
+                                      lastBreadcrumb.id.startsWith('loading-') &&
+                                      pageId !== lastBreadcrumb.id;
+
+      let newBreadcrumbs;
+      if (isReplacingPlaceholder) {
+        // Replace the last (loading) breadcrumb with the real page
+        newBreadcrumbs = [...prevSession.breadcrumbs.slice(0, -1), { id: pageId, title: pageTitle }];
+      } else {
+        const shouldAddBreadcrumb = !lastBreadcrumb || lastBreadcrumb.id !== pageId;
+        newBreadcrumbs = shouldAddBreadcrumb
+          ? [...prevSession.breadcrumbs, { id: pageId, title: pageTitle }]
+          : prevSession.breadcrumbs;
+      }
+
+      const updatedSession = {
+        ...prevSession,
+        pages: prevSession.pages.includes(pageId) ? prevSession.pages : [...prevSession.pages, pageId],
+        currentPageId: pageId,
+        breadcrumbs: deduplicateBreadcrumbs(newBreadcrumbs).slice(-10)
+      };
+
+      // Save to storage
+      storage.saveSession(updatedSession);
+      
+      return updatedSession;
+    });
+    
+    if (shouldCreateNew) {
+      await createNewSession(pageId, pageTitle);
+    }
+  }, [createNewSession]);
+
   useEffect(() => {
     loadAllData(true).then(() => setIsInitialized(true));
   }, []);
@@ -197,16 +270,21 @@ export default function Home() {
             await recordPageView(pageId);
             
             // Handle breadcrumb navigation (trim breadcrumbs)
-            if (breadcrumbIndex !== null && session) {
+            if (breadcrumbIndex !== null) {
               const index = parseInt(breadcrumbIndex, 10);
               if (!isNaN(index) && index >= 0) {
-                const updatedSession = {
-                  ...session,
-                  currentPageId: pageId,
-                  breadcrumbs: session.breadcrumbs.slice(0, index + 1)
-                };
-                await storage.saveSession(updatedSession);
-                setSession(updatedSession);
+                // Use functional update to avoid session dependency
+                setSession(prevSession => {
+                  if (!prevSession) return prevSession;
+                  
+                  const updatedSession = {
+                    ...prevSession,
+                    currentPageId: pageId,
+                    breadcrumbs: prevSession.breadcrumbs.slice(0, index + 1)
+                  };
+                  storage.saveSession(updatedSession);
+                  return updatedSession;
+                });
                 return; // Skip normal session update
               }
             }
@@ -234,7 +312,7 @@ export default function Home() {
     return () => {
       abortController.abort();
     };
-  }, [searchParams, isInitialized, recordPageView]);
+  }, [searchParams, isInitialized, recordPageView, updateSession]);
 
   // Helper function to navigate with URL update and scroll to top
   const navigateToPageWithHistory = (pageId: string, pageTitle: string) => {
@@ -245,65 +323,6 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
     // Note: Page loading, view recording, and session update happen in useEffect above
-  };
-
-  const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
-    const newSession: LearningSession = {
-      id: 'session-' + Date.now(),
-      name: `Learning: ${firstPageTitle}`,
-      startedAt: Date.now(),
-      pages: [firstPageId],
-      currentPageId: firstPageId,
-      breadcrumbs: [{ id: firstPageId, title: firstPageTitle }]
-    };
-
-    await storage.saveSession(newSession);
-    setSession(newSession);
-  };
-
-  const recordPageView = useCallback(async (pageId: string) => {
-    // Record the view in the database
-    await storage.recordPageView(pageId);
-
-    // Update local state to reflect the view
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
-
-  const updateSession = async (pageId: string, pageTitle: string) => {
-    if (!session) {
-      await createNewSession(pageId, pageTitle);
-      return;
-    }
-
-    const lastBreadcrumb = session.breadcrumbs[session.breadcrumbs.length - 1];
-
-    // Check if the last breadcrumb is a temporary loading placeholder that should be replaced
-    const isReplacingPlaceholder = lastBreadcrumb &&
-                                    lastBreadcrumb.id.startsWith('loading-') &&
-                                    pageId !== lastBreadcrumb.id;
-
-    let newBreadcrumbs;
-    if (isReplacingPlaceholder) {
-      // Replace the last (loading) breadcrumb with the real page
-      newBreadcrumbs = [...session.breadcrumbs.slice(0, -1), { id: pageId, title: pageTitle }];
-    } else {
-      const shouldAddBreadcrumb = !lastBreadcrumb || lastBreadcrumb.id !== pageId;
-      newBreadcrumbs = shouldAddBreadcrumb
-        ? [...session.breadcrumbs, { id: pageId, title: pageTitle }]
-        : session.breadcrumbs;
-    }
-
-    const updatedSession = {
-      ...session,
-      pages: session.pages.includes(pageId) ? session.pages : [...session.pages, pageId],
-      currentPageId: pageId,
-      breadcrumbs: deduplicateBreadcrumbs(newBreadcrumbs).slice(-10)
-    };
-
-    await storage.saveSession(updatedSession);
-    setSession(updatedSession);
   };
 
   // Helper function to create a generation job and poll for completion
