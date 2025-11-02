@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, PageView } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, PageView, AuthSession } from './types';
 import { getDatabasePath, databaseExists, createDatabase } from './db-manager';
 
 // Cache for database connections
@@ -87,6 +87,14 @@ function initializeDatabase(db: Database.Database) {
       view_count INTEGER NOT NULL DEFAULT 1
     );
 
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      invitation_code TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      last_active_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_title ON wiki_pages(title);
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON wiki_pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_started ON learning_sessions(started_at DESC);
@@ -94,6 +102,7 @@ function initializeDatabase(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status);
     CREATE INDEX IF NOT EXISTS idx_jobs_created ON generation_jobs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_page_views_last_viewed ON page_views(last_viewed_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
   `);
 }
 
@@ -497,6 +506,63 @@ function rowToPageView(row: any): PageView {
   };
 }
 
+function rowToAuthSession(row: any): AuthSession {
+  return {
+    id: row.id,
+    invitationCode: row.invitation_code,
+    createdAt: row.created_at,
+    lastActiveAt: row.last_active_at,
+    expiresAt: row.expires_at
+  };
+}
+
+export function getDbAuthSessions(dbName: string = 'default') {
+  return {
+    getById: (id: string): AuthSession | null => {
+      const db = getDatabase(dbName);
+      const row = db.prepare('SELECT * FROM auth_sessions WHERE id = ?').get(id);
+      return row ? rowToAuthSession(row) : null;
+    },
+
+    create: (session: AuthSession) => {
+      const db = getDatabase(dbName);
+      const stmt = db.prepare(`
+        INSERT INTO auth_sessions (id, invitation_code, created_at, last_active_at, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        session.id,
+        session.invitationCode,
+        session.createdAt,
+        session.lastActiveAt,
+        session.expiresAt
+      );
+    },
+
+    updateLastActive: (id: string, timestamp: number) => {
+      const db = getDatabase(dbName);
+      const stmt = db.prepare('UPDATE auth_sessions SET last_active_at = ? WHERE id = ?');
+      stmt.run(timestamp, id);
+    },
+
+    delete: (id: string) => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM auth_sessions WHERE id = ?').run(id);
+    },
+
+    deleteExpired: (): number => {
+      const db = getDatabase(dbName);
+      const result = db.prepare('DELETE FROM auth_sessions WHERE expires_at < ?').run(Date.now());
+      return (result as Database.RunResult).changes || 0;
+    },
+
+    deleteAll: () => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM auth_sessions').run();
+    }
+  };
+}
+
 export function closeDatabase(dbName?: string) {
   if (dbName) {
     const db = dbConnections.get(dbName);
@@ -519,3 +585,4 @@ export const dbSessions = getDbSessions();
 export const dbBookmarks = getDbBookmarks();
 export const dbMindmap = getDbMindmap();
 export const dbJobs = getDbJobs();
+export const dbAuthSessions = getDbAuthSessions();
