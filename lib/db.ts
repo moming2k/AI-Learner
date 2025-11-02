@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, PageView } from './types';
 import { getDatabasePath, databaseExists, createDatabase } from './db-manager';
 
 // Cache for database connections
@@ -80,12 +80,20 @@ function initializeDatabase(db: Database.Database) {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS page_views (
+      page_id TEXT PRIMARY KEY,
+      first_viewed_at INTEGER NOT NULL,
+      last_viewed_at INTEGER NOT NULL,
+      view_count INTEGER NOT NULL DEFAULT 1
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_title ON wiki_pages(title);
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON wiki_pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_started ON learning_sessions(started_at DESC);
     CREATE INDEX IF NOT EXISTS idx_bookmarks_timestamp ON bookmarks(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status);
     CREATE INDEX IF NOT EXISTS idx_jobs_created ON generation_jobs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_page_views_last_viewed ON page_views(last_viewed_at DESC);
   `);
 }
 
@@ -367,6 +375,63 @@ export function getDbJobs(dbName: string = 'default') {
   };
 }
 
+export function getDbPageViews(dbName: string = 'default') {
+  return {
+    getAll: (): PageView[] => {
+      const db = getDatabase(dbName);
+      const rows = db.prepare('SELECT * FROM page_views ORDER BY last_viewed_at DESC').all();
+      return rows.map(rowToPageView);
+    },
+
+    getByPageId: (pageId: string): PageView | null => {
+      const db = getDatabase(dbName);
+      const row = db.prepare('SELECT * FROM page_views WHERE page_id = ?').get(pageId);
+      return row ? rowToPageView(row) : null;
+    },
+
+    getAllViewedPageIds: (): string[] => {
+      const db = getDatabase(dbName);
+      const rows = db.prepare('SELECT page_id FROM page_views').all() as { page_id: string }[];
+      return rows.map(row => row.page_id);
+    },
+
+    recordView: (pageId: string) => {
+      const db = getDatabase(dbName);
+      const now = Date.now();
+
+      // Check if page has been viewed before
+      const existing = db.prepare('SELECT * FROM page_views WHERE page_id = ?').get(pageId);
+
+      if (existing) {
+        // Update existing view record
+        const stmt = db.prepare(`
+          UPDATE page_views
+          SET last_viewed_at = ?, view_count = view_count + 1
+          WHERE page_id = ?
+        `);
+        stmt.run(now, pageId);
+      } else {
+        // Insert new view record
+        const stmt = db.prepare(`
+          INSERT INTO page_views (page_id, first_viewed_at, last_viewed_at, view_count)
+          VALUES (?, ?, ?, 1)
+        `);
+        stmt.run(pageId, now, now);
+      }
+    },
+
+    deleteAll: () => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM page_views').run();
+    },
+
+    deleteByPageId: (pageId: string) => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM page_views WHERE page_id = ?').run(pageId);
+    }
+  };
+}
+
 function rowToWikiPage(row: any): WikiPage {
   return {
     id: row.id,
@@ -420,6 +485,15 @@ function rowToJob(row: any): GenerationJob {
     error: row.error || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function rowToPageView(row: any): PageView {
+  return {
+    pageId: row.page_id,
+    firstViewedAt: row.first_viewed_at,
+    lastViewedAt: row.last_viewed_at,
+    viewCount: row.view_count
   };
 }
 

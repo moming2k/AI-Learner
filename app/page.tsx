@@ -18,6 +18,7 @@ export default function Home() {
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [allPages, setAllPages] = useState<WikiPageType[]>([]);
+  const [viewedPageIds, setViewedPageIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPages, setLoadingPages] = useState<Set<string>>(new Set());
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
@@ -51,11 +52,12 @@ export default function Home() {
 
   const loadAllData = async (showToast: boolean = false) => {
     // Execute all data loading operations in parallel for faster startup
-    const [duplicatesRemoved, savedSession, savedBookmarks, pages] = await Promise.all([
+    const [duplicatesRemoved, savedSession, savedBookmarks, pages, viewedIds] = await Promise.all([
       storage.removeDuplicatePages(),
       storage.getCurrentSession(),
       storage.getBookmarks(),
-      storage.getPages()
+      storage.getPages(),
+      storage.getViewedPageIds()
     ]);
 
     if (duplicatesRemoved > 0 && showToast) {
@@ -142,6 +144,7 @@ export default function Home() {
 
     setBookmarks(savedBookmarks);
     setAllPages(pages);
+    setViewedPageIds(viewedIds);
   };
 
   const handleDatabaseChange = async () => {
@@ -150,6 +153,7 @@ export default function Home() {
     setSession(null);
     setBookmarks([]);
     setAllPages([]);
+    setViewedPageIds([]);
     setLoadingPages(new Set());
     setLoadingTopics(new Set());
 
@@ -180,6 +184,16 @@ export default function Home() {
 
     await storage.saveSession(newSession);
     setSession(newSession);
+  };
+
+  const recordPageView = async (pageId: string) => {
+    // Record the view in the database
+    await storage.recordPageView(pageId);
+
+    // Update local state to reflect the view
+    if (!viewedPageIds.includes(pageId)) {
+      setViewedPageIds(prev => [...prev, pageId]);
+    }
   };
 
   const updateSession = async (pageId: string, pageTitle: string) => {
@@ -294,6 +308,7 @@ export default function Home() {
       if (navigateAfter) {
         setCurrentPage(exactMatch);
         await updateSession(exactMatch.id, exactMatch.title);
+        await recordPageView(exactMatch.id);
         addToast({
           title: 'Page found',
           message: `"${exactMatch.title}" already exists`,
@@ -382,6 +397,7 @@ export default function Home() {
         // Update the placeholder page with real content
         setCurrentPage(page);
         await updateSession(page.id, page.title);
+        await recordPageView(page.id);
       }
 
       return page;
@@ -466,6 +482,7 @@ export default function Home() {
       if (similarPage) {
         setCurrentPage(similarPage);
         await updateSession(similarPage.id, similarPage.title);
+        await recordPageView(similarPage.id);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -513,6 +530,7 @@ export default function Home() {
       // Update placeholder with real content
       setCurrentPage(answerPage);
       await updateSession(answerPage.id, answerPage.title);
+      await recordPageView(answerPage.id);
     } catch (error) {
       console.error('Error asking question:', error);
 
@@ -603,6 +621,7 @@ export default function Home() {
       if (similarPage && !similarPage.isPlaceholder) {
         setCurrentPage(similarPage);
         await updateSession(similarPage.id, similarPage.title);
+        await recordPageView(similarPage.id);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -649,6 +668,7 @@ export default function Home() {
       // Update placeholder with real content
       setCurrentPage(newPage);
       await updateSession(newPage.id, newPage.title);
+      await recordPageView(newPage.id);
     } catch (error) {
       console.error('Error generating from selection:', error);
 
@@ -682,6 +702,7 @@ export default function Home() {
     const page = await storage.getPage(pageId);
     if (page) {
       setCurrentPage(page);
+      await recordPageView(pageId);
 
       // Check if this page is in the current breadcrumbs
       if (session) {
@@ -791,7 +812,7 @@ export default function Home() {
                   isLoading={isLoading}
                   onGenerateFromSelection={handleGenerateFromSelection}
                   allPages={allPages}
-                  viewedPageIds={session?.pages || []}
+                  viewedPageIds={viewedPageIds}
                 />
               </>
             )}
@@ -808,7 +829,7 @@ export default function Home() {
             onSearch={handleTopicSearch}
             loadingPages={loadingPages}
             allPages={allPages}
-            viewedPageIds={session?.pages || []}
+            viewedPageIds={viewedPageIds}
           />
         )}
       </div>
@@ -821,6 +842,7 @@ export default function Home() {
             if (page) {
               setCurrentPage(page);
               await updateSession(page.id, page.title);
+              await recordPageView(page.id);
               setShowLibrary(false);
             }
           }}
