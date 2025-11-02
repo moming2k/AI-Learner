@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
 import { generateMindmapNode } from '@/lib/ai-service';
@@ -14,6 +15,8 @@ import DatabaseSelector from '@/components/DatabaseSelector';
 import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon } from 'lucide-react';
 
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState<WikiPageType | null>(null);
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -24,6 +27,7 @@ export default function Home() {
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = Date.now().toString();
@@ -169,8 +173,43 @@ export default function Home() {
   };
 
   useEffect(() => {
-    loadAllData(true);
+    loadAllData(true).then(() => setIsInitialized(true));
   }, []);
+
+  // Handle URL changes (back/forward button)
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const pageId = searchParams.get('page');
+
+    if (pageId) {
+      // Load page from URL
+      const loadPageFromUrl = async () => {
+        const page = await storage.getPage(pageId);
+        if (page) {
+          setCurrentPage(page);
+          await recordPageView(pageId);
+          // Don't update URL here to avoid infinite loop
+        }
+      };
+      loadPageFromUrl();
+    } else {
+      // No page in URL, clear current page
+      setCurrentPage(null);
+    }
+  }, [searchParams, isInitialized]);
+
+  // Helper function to navigate with URL update and scroll to top
+  const navigateToPageWithHistory = async (pageId: string, pageTitle: string) => {
+    // Update URL for browser history
+    router.push(`?page=${encodeURIComponent(pageId)}`, { scroll: false });
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Update session
+    await updateSession(pageId, pageTitle);
+  };
 
   const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
     const newSession: LearningSession = {
@@ -307,8 +346,8 @@ export default function Home() {
     if (shouldNavigateExisting) {
       if (navigateAfter) {
         setCurrentPage(exactMatch);
-        await updateSession(exactMatch.id, exactMatch.title);
         await recordPageView(exactMatch.id);
+        await navigateToPageWithHistory(exactMatch.id, exactMatch.title);
         addToast({
           title: 'Page found',
           message: `"${exactMatch.title}" already exists`,
@@ -396,8 +435,8 @@ export default function Home() {
       if (navigateAfter) {
         // Update the placeholder page with real content
         setCurrentPage(page);
-        await updateSession(page.id, page.title);
         await recordPageView(page.id);
+        await navigateToPageWithHistory(page.id, page.title);
       }
 
       return page;
@@ -481,8 +520,8 @@ export default function Home() {
 
       if (similarPage) {
         setCurrentPage(similarPage);
-        await updateSession(similarPage.id, similarPage.title);
         await recordPageView(similarPage.id);
+        await navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -529,8 +568,8 @@ export default function Home() {
 
       // Update placeholder with real content
       setCurrentPage(answerPage);
-      await updateSession(answerPage.id, answerPage.title);
       await recordPageView(answerPage.id);
+      await navigateToPageWithHistory(answerPage.id, answerPage.title);
     } catch (error) {
       console.error('Error asking question:', error);
 
@@ -620,8 +659,8 @@ export default function Home() {
 
       if (similarPage && !similarPage.isPlaceholder) {
         setCurrentPage(similarPage);
-        await updateSession(similarPage.id, similarPage.title);
         await recordPageView(similarPage.id);
+        await navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -667,8 +706,8 @@ export default function Home() {
 
       // Update placeholder with real content
       setCurrentPage(newPage);
-      await updateSession(newPage.id, newPage.title);
       await recordPageView(newPage.id);
+      await navigateToPageWithHistory(newPage.id, newPage.title);
     } catch (error) {
       console.error('Error generating from selection:', error);
 
@@ -703,6 +742,10 @@ export default function Home() {
     if (page) {
       setCurrentPage(page);
       await recordPageView(pageId);
+
+      // Update URL and scroll to top
+      router.push(`?page=${encodeURIComponent(pageId)}`, { scroll: false });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       // Check if this page is in the current breadcrumbs
       if (session) {
@@ -760,7 +803,10 @@ export default function Home() {
                   )}
                   {currentPage && (
                     <button
-                      onClick={() => setCurrentPage(null)}
+                      onClick={() => {
+                        setCurrentPage(null);
+                        router.push('/');
+                      }}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg
                                bg-gradient-to-r from-gray-500 to-gray-600
                                text-white font-medium hover:from-gray-600 hover:to-gray-700
@@ -841,8 +887,8 @@ export default function Home() {
             const page = await storage.getPage(pageId);
             if (page) {
               setCurrentPage(page);
-              await updateSession(page.id, page.title);
               await recordPageView(page.id);
+              await navigateToPageWithHistory(page.id, page.title);
               setShowLibrary(false);
             }
           }}
