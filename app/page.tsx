@@ -381,9 +381,7 @@ export default function Home() {
     // If page exists, navigate immediately (only if navigateAfter is true)
     if (shouldNavigateExisting) {
       if (navigateAfter) {
-        setCurrentPage(exactMatch);
-        await recordPageView(exactMatch.id);
-        await navigateToPageWithHistory(exactMatch.id, exactMatch.title);
+        navigateToPageWithHistory(exactMatch.id, exactMatch.title);
         addToast({
           title: 'Page found',
           message: `"${exactMatch.title}" already exists`,
@@ -469,10 +467,8 @@ export default function Home() {
       });
 
       if (navigateAfter) {
-        // Update the placeholder page with real content
-        setCurrentPage(page);
-        await recordPageView(page.id);
-        await navigateToPageWithHistory(page.id, page.title);
+        // Navigate to the generated page
+        navigateToPageWithHistory(page.id, page.title);
       }
 
       return page;
@@ -555,9 +551,7 @@ export default function Home() {
       );
 
       if (similarPage) {
-        setCurrentPage(similarPage);
-        await recordPageView(similarPage.id);
-        await navigateToPageWithHistory(similarPage.id, similarPage.title);
+        navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -602,10 +596,8 @@ export default function Home() {
         duration: 5000
       });
 
-      // Update placeholder with real content
-      setCurrentPage(answerPage);
-      await recordPageView(answerPage.id);
-      await navigateToPageWithHistory(answerPage.id, answerPage.title);
+      // Navigate to the generated answer page
+      navigateToPageWithHistory(answerPage.id, answerPage.title);
     } catch (error) {
       console.error('Error asking question:', error);
 
@@ -694,9 +686,7 @@ export default function Home() {
       );
 
       if (similarPage && !similarPage.isPlaceholder) {
-        setCurrentPage(similarPage);
-        await recordPageView(similarPage.id);
-        await navigateToPageWithHistory(similarPage.id, similarPage.title);
+        navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
           message: `"${similarPage.title}" already exists`,
@@ -740,10 +730,8 @@ export default function Home() {
         duration: 5000
       });
 
-      // Update placeholder with real content
-      setCurrentPage(newPage);
-      await recordPageView(newPage.id);
-      await navigateToPageWithHistory(newPage.id, newPage.title);
+      // Navigate to the generated page
+      navigateToPageWithHistory(newPage.id, newPage.title);
     } catch (error) {
       console.error('Error generating from selection:', error);
 
@@ -776,34 +764,24 @@ export default function Home() {
   const handleNavigateToPage = async (pageId: string) => {
     const page = await storage.getPage(pageId);
     if (page) {
-      setCurrentPage(page);
-      await recordPageView(pageId);
-
-      // Update URL and scroll to top
-      router.push(`?page=${encodeURIComponent(pageId)}`, { scroll: false });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
       // Check if this page is in the current breadcrumbs
       if (session) {
         const breadcrumbIndex = session.breadcrumbs.findIndex(b => b.id === pageId);
 
         if (breadcrumbIndex >= 0) {
-          // Trim breadcrumbs to this point (going back in history)
-          const updatedSession = {
-            ...session,
-            currentPageId: pageId,
-            breadcrumbs: session.breadcrumbs.slice(0, breadcrumbIndex + 1)
-          };
-          await storage.saveSession(updatedSession);
-          setSession(updatedSession);
+          // Breadcrumb navigation - include index to trim breadcrumbs
+          router.push(`?page=${encodeURIComponent(pageId)}&title=${encodeURIComponent(page.title)}&breadcrumbIndex=${breadcrumbIndex}`, { scroll: false });
         } else {
-          // Not in breadcrumbs, add it normally
-          await updateSession(page.id, page.title);
+          // Normal navigation - not in breadcrumbs, add it normally
+          navigateToPageWithHistory(page.id, page.title);
         }
       } else {
-        // No session, create one
-        await updateSession(page.id, page.title);
+        // No session, use normal navigation
+        navigateToPageWithHistory(page.id, page.title);
       }
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -922,9 +900,7 @@ export default function Home() {
           onPageClick={async (pageId) => {
             const page = await storage.getPage(pageId);
             if (page) {
-              setCurrentPage(page);
-              await recordPageView(page.id);
-              await navigateToPageWithHistory(page.id, page.title);
+              navigateToPageWithHistory(page.id, page.title);
               setShowLibrary(false);
             }
           }}
