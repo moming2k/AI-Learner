@@ -176,11 +176,13 @@ export default function Home() {
     loadAllData(true).then(() => setIsInitialized(true));
   }, []);
 
-  // Handle URL changes (back/forward button)
+  // Handle URL changes (back/forward button and navigation)
   useEffect(() => {
     if (!isInitialized) return;
 
     const pageId = searchParams.get('page');
+    const pageTitle = searchParams.get('title');
+    const breadcrumbIndex = searchParams.get('breadcrumbIndex');
     const abortController = new AbortController();
 
     if (pageId) {
@@ -193,7 +195,25 @@ export default function Home() {
           if (!abortController.signal.aborted && page) {
             setCurrentPage(page);
             await recordPageView(pageId);
-            // Don't update URL here to avoid infinite loop
+            
+            // Handle breadcrumb navigation (trim breadcrumbs)
+            if (breadcrumbIndex !== null && session) {
+              const index = parseInt(breadcrumbIndex, 10);
+              if (!isNaN(index) && index >= 0) {
+                const updatedSession = {
+                  ...session,
+                  currentPageId: pageId,
+                  breadcrumbs: session.breadcrumbs.slice(0, index + 1)
+                };
+                await storage.saveSession(updatedSession);
+                setSession(updatedSession);
+                return; // Skip normal session update
+              }
+            }
+            
+            // Normal navigation: update session with actual page title
+            const title = page.title || pageTitle || 'Untitled';
+            await updateSession(pageId, title);
           }
         } catch (error) {
           // Only log error if not aborted
@@ -217,15 +237,14 @@ export default function Home() {
   }, [searchParams, isInitialized]);
 
   // Helper function to navigate with URL update and scroll to top
-  const navigateToPageWithHistory = async (pageId: string, pageTitle: string) => {
-    // Update URL for browser history
-    router.push(`?page=${encodeURIComponent(pageId)}`, { scroll: false });
+  const navigateToPageWithHistory = (pageId: string, pageTitle: string) => {
+    // Update URL for browser history - include title for session updates
+    router.push(`?page=${encodeURIComponent(pageId)}&title=${encodeURIComponent(pageTitle)}`, { scroll: false });
 
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Update session
-    await updateSession(pageId, pageTitle);
+    
+    // Note: Page loading, view recording, and session update happen in useEffect above
   };
 
   const createNewSession = async (firstPageId: string, firstPageTitle: string) => {
