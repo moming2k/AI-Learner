@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
@@ -197,7 +197,7 @@ export default function Home() {
       // No page in URL, clear current page
       setCurrentPage(null);
     }
-  }, [searchParams, isInitialized]);
+  }, [searchParams, isInitialized, recordPageView]);
 
   // Helper function to navigate with URL update and scroll to top
   const navigateToPageWithHistory = async (pageId: string, pageTitle: string) => {
@@ -225,7 +225,7 @@ export default function Home() {
     setSession(newSession);
   };
 
-  const recordPageView = async (pageId: string) => {
+  const recordPageView = useCallback(async (pageId: string) => {
     // Record the view in the database
     await storage.recordPageView(pageId);
 
@@ -233,7 +233,7 @@ export default function Home() {
     if (!viewedPageIds.includes(pageId)) {
       setViewedPageIds(prev => [...prev, pageId]);
     }
-  };
+  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
