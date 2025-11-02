@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
@@ -21,7 +21,7 @@ export default function Home() {
   const [session, setSession] = useState<LearningSession | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [allPages, setAllPages] = useState<WikiPageType[]>([]);
-  const [viewedPageIds, setViewedPageIds] = useState<string[]>([]);
+  const [viewedPageIds, setViewedPageIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPages, setLoadingPages] = useState<Set<string>>(new Set());
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
@@ -218,7 +218,7 @@ export default function Home() {
       // No page in URL, clear current page
       setCurrentPage(null);
     }
-  }, [searchParams, isInitialized]);
+  }, [searchParams, isInitialized, recordPageView]);
 
   // Helper function to navigate with URL update and scroll to top
   const navigateToPageWithHistory = (pageId: string, pageTitle: string) => {
@@ -245,7 +245,7 @@ export default function Home() {
     setSession(newSession);
   };
 
-  const recordPageView = async (pageId: string) => {
+  const recordPageView = useCallback(async (pageId: string) => {
     // Record the view in the database
     const success = await storage.recordPageView(pageId);
     
@@ -254,10 +254,10 @@ export default function Home() {
     }
 
     // Update local state to reflect the view (optimistic update)
-    if (!viewedPageIds.includes(pageId)) {
-      setViewedPageIds(prev => [...prev, pageId]);
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
     }
-  };
+  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
