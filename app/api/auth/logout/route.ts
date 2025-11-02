@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbAuthSessions } from '@/lib/db';
+import { sessionCache } from '@/lib/session-cache';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
@@ -10,6 +11,9 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       // Delete session from database
       dbAuthSessions.delete(sessionId);
+      
+      // Remove session from cache
+      sessionCache.delete(sessionId);
 
       // Clear cookie
       cookieStore.delete('ai-learner-session');

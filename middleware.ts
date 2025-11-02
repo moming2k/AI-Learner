@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { dbAuthSessions } from '@/lib/db';
+import { sessionCache } from '@/lib/session-cache';
 import { isSessionExpired, shouldUpdateActivity } from '@/lib/auth';
 
 // Public paths that don't require authentication
@@ -30,8 +30,8 @@ export function middleware(request: NextRequest) {
     return redirectToLogin(request);
   }
 
-  // Validate session
-  const session = dbAuthSessions.getById(sessionId);
+  // Validate session using cache (non-blocking)
+  const session = sessionCache.get(sessionId);
 
   if (!session) {
     return redirectToLogin(request);
@@ -39,14 +39,17 @@ export function middleware(request: NextRequest) {
 
   // Check if session is expired
   if (isSessionExpired(session)) {
-    dbAuthSessions.delete(sessionId);
+    sessionCache.delete(sessionId);
     return redirectToLogin(request);
   }
 
-  // Update last active timestamp if needed
+  // Update last active timestamp if needed (non-blocking)
   if (shouldUpdateActivity(session)) {
-    dbAuthSessions.updateLastActive(sessionId, Date.now());
+    sessionCache.updateLastActive(sessionId, Date.now());
   }
+
+  // Perform periodic cache cleanup (non-blocking)
+  sessionCache.cleanup();
 
   return NextResponse.next();
 }
