@@ -176,6 +176,16 @@ export default function Home() {
     loadAllData(true).then(() => setIsInitialized(true));
   }, []);
 
+  const recordPageView = useCallback(async (pageId: string) => {
+    // Record the view in the database
+    await storage.recordPageView(pageId);
+
+    // Update local state to reflect the view
+    if (!viewedPageIds.has(pageId)) {
+      setViewedPageIds(prev => new Set([...prev, pageId]));
+    }
+  }, [viewedPageIds]);
+
   // Handle URL changes (back/forward button and navigation)
   useEffect(() => {
     if (!isInitialized) return;
@@ -260,16 +270,6 @@ export default function Home() {
     await storage.saveSession(newSession);
     setSession(newSession);
   };
-
-  const recordPageView = useCallback(async (pageId: string) => {
-    // Record the view in the database
-    await storage.recordPageView(pageId);
-
-    // Update local state to reflect the view
-    if (!viewedPageIds.has(pageId)) {
-      setViewedPageIds(prev => new Set([...prev, pageId]));
-    }
-  }, [viewedPageIds]);
 
   const updateSession = async (pageId: string, pageTitle: string) => {
     if (!session) {
