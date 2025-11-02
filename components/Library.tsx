@@ -2,7 +2,7 @@
 
 import { WikiPage } from '@/lib/types';
 import { storage } from '@/lib/storage';
-import { BookOpen, Clock, Search, Grid, List, X, Trash2, AlertCircle } from 'lucide-react';
+import { BookOpen, Clock, Search, Grid, List, X, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 
 interface LibraryProps {
@@ -12,15 +12,21 @@ interface LibraryProps {
   onClose?: () => void;
   onCleanup?: () => void;
   onDeletePage?: (pageId: string) => void;
+  viewedPageIds?: string[];
 }
 
-export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage }: LibraryProps) {
+export default function Library({ pages, onPageClick, currentPageId, onClose, onCleanup, onDeletePage, viewedPageIds = [] }: LibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical'>('recent');
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if a page has been viewed
+  const isPageViewed = (pageId: string): boolean => {
+    return viewedPageIds.includes(pageId);
+  };
 
   // Check for duplicates on mount
   useEffect(() => {
@@ -231,74 +237,41 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {displayedPages.map((page) => (
-                <div
-                  key={page.id}
-                  className={`relative group p-4 rounded-xl border-2 text-left transition-all cursor-pointer
-                           hover:shadow-lg hover:border-blue-300 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50
-                           ${currentPageId === page.id
-                             ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50'
-                             : 'border-gray-200 bg-white'
-                           }`}
-                  onClick={() => onPageClick(page.id)}
-                >
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 pr-8">
-                    {page.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-3">
-                    {getPreview(page.content)}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatDate(page.createdAt)}</span>
-                  </div>
+              {displayedPages.map((page) => {
+                const isViewed = isPageViewed(page.id);
+                return (
                   <div
-                    onClick={(e) => handleDeletePage(page.id, page.title, e)}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg
-                             hover:bg-red-100 text-red-600 transition-all cursor-pointer"
-                    title="Delete page"
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleDeletePage(page.id, page.title, e as any);
-                      }
-                    }}
+                    key={page.id}
+                    className={`relative group p-4 rounded-xl border-2 text-left transition-all cursor-pointer
+                             hover:shadow-lg hover:border-blue-300 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50
+                             ${currentPageId === page.id
+                               ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50'
+                               : 'border-gray-200 bg-white'
+                             }`}
+                    onClick={() => onPageClick(page.id)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {displayedPages.map((page) => (
-                <div
-                  key={page.id}
-                  className={`relative group w-full p-4 rounded-lg border text-left transition-all cursor-pointer
-                           hover:shadow-md hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
-                           ${currentPageId === page.id
-                             ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50'
-                             : 'border-gray-200 bg-white'
-                           }`}
-                  onClick={() => onPageClick(page.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 pr-12">
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {page.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {getPreview(page.content)}
-                      </p>
-                    </div>
-                    <div className="ml-4 text-xs text-gray-500 whitespace-nowrap">
-                      {formatDate(page.createdAt)}
+                    {/* Viewed Status Badge */}
+                    {isViewed && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full
+                                   bg-green-100 text-green-700 text-xs font-medium">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Viewed</span>
+                      </div>
+                    )}
+
+                    <h3 className={`font-semibold text-gray-900 mb-2 line-clamp-2 pr-8 ${isViewed ? 'mt-6' : ''}`}>
+                      {page.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-3">
+                      {getPreview(page.content)}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Clock className="w-3 h-3" />
+                      <span>{formatDate(page.createdAt)}</span>
                     </div>
                     <div
                       onClick={(e) => handleDeletePage(page.id, page.title, e)}
-                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 rounded-lg
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg
                                hover:bg-red-100 text-red-600 transition-all cursor-pointer"
                       title="Delete page"
                       role="button"
@@ -313,8 +286,65 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                       <Trash2 className="w-4 h-4" />
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {displayedPages.map((page) => {
+                const isViewed = isPageViewed(page.id);
+                return (
+                  <div
+                    key={page.id}
+                    className={`relative group w-full p-4 rounded-lg border text-left transition-all cursor-pointer
+                             hover:shadow-md hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50
+                             ${currentPageId === page.id
+                               ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50'
+                               : 'border-gray-200 bg-white'
+                             }`}
+                    onClick={() => onPageClick(page.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 pr-12">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-900">
+                            {page.title}
+                          </h3>
+                          {isViewed && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full
+                                         bg-green-100 text-green-700 text-xs font-medium whitespace-nowrap">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Viewed</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {getPreview(page.content)}
+                        </p>
+                      </div>
+                      <div className="ml-4 text-xs text-gray-500 whitespace-nowrap">
+                        {formatDate(page.createdAt)}
+                      </div>
+                      <div
+                        onClick={(e) => handleDeletePage(page.id, page.title, e)}
+                        className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 rounded-lg
+                                 hover:bg-red-100 text-red-600 transition-all cursor-pointer"
+                        title="Delete page"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleDeletePage(page.id, page.title, e as any);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

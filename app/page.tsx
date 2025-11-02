@@ -891,6 +891,7 @@ export default function Home() {
               }
             }
           }}
+          viewedPageIds={viewedPageIds}
         />
       )}
 
