@@ -27,6 +27,15 @@ export function getDatabase(dbName: string = 'default'): Database.Database {
   return db;
 }
 
+function ensureColumn(db: Database.Database, table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const hasColumn = columns.some(existingColumn => existingColumn.name === column);
+
+  if (!hasColumn) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 function initializeDatabase(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS wiki_pages (
@@ -89,10 +98,15 @@ function initializeDatabase(db: Database.Database) {
 
     CREATE TABLE IF NOT EXISTS auth_sessions (
       id TEXT PRIMARY KEY,
-      invitation_code TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'agentkea',
+      auth_user_id TEXT,
+      email TEXT,
+      display_name TEXT,
+      database_key TEXT,
       created_at INTEGER NOT NULL,
       last_active_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL
+      expires_at INTEGER NOT NULL,
+      invitation_code TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_pages_title ON wiki_pages(title);
@@ -103,6 +117,23 @@ function initializeDatabase(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_jobs_created ON generation_jobs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_page_views_last_viewed ON page_views(last_viewed_at DESC);
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+  `);
+
+  ensureColumn(db, 'auth_sessions', 'provider', "TEXT NOT NULL DEFAULT 'agentkea'");
+  ensureColumn(db, 'auth_sessions', 'auth_user_id', 'TEXT');
+  ensureColumn(db, 'auth_sessions', 'email', 'TEXT');
+  ensureColumn(db, 'auth_sessions', 'display_name', 'TEXT');
+  ensureColumn(db, 'auth_sessions', 'database_key', 'TEXT');
+  ensureColumn(db, 'auth_sessions', 'invitation_code', 'TEXT');
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(auth_user_id);
+  `);
+
+  db.exec(`
+    UPDATE auth_sessions
+    SET provider = COALESCE(NULLIF(provider, ''), 'agentkea')
+    WHERE provider IS NULL OR provider = '';
   `);
 }
 
@@ -509,7 +540,13 @@ function rowToPageView(row: any): PageView {
 function rowToAuthSession(row: any): AuthSession {
   return {
     id: row.id,
-    invitationCode: row.invitation_code,
+    user: {
+      provider: 'agentkea',
+      authUserId: row.auth_user_id,
+      email: row.email,
+      displayName: row.display_name,
+      databaseKey: row.database_key
+    },
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
     expiresAt: row.expires_at
@@ -527,12 +564,16 @@ export function getDbAuthSessions(dbName: string = 'default') {
     create: (session: AuthSession) => {
       const db = getDatabase(dbName);
       const stmt = db.prepare(`
-        INSERT INTO auth_sessions (id, invitation_code, created_at, last_active_at, expires_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO auth_sessions (id, provider, auth_user_id, email, display_name, database_key, created_at, last_active_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       stmt.run(
         session.id,
-        session.invitationCode,
+        session.user.provider,
+        session.user.authUserId,
+        session.user.email ?? null,
+        session.user.displayName ?? null,
+        session.user.databaseKey,
         session.createdAt,
         session.lastActiveAt,
         session.expiresAt

@@ -4,7 +4,6 @@ import { requireAuth, unauthorizedResponse, isAuthRequired } from '@/lib/auth-gu
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // If auth is not required, return success
   if (!isAuthRequired()) {
     return NextResponse.json({
       authenticated: false,
@@ -24,7 +23,7 @@ export async function GET() {
     authRequired: true,
     session: {
       id: session.id,
-      invitationCode: session.invitationCode,
+      user: session.user,
       createdAt: session.createdAt,
       lastActiveAt: session.lastActiveAt,
       expiresAt: session.expiresAt

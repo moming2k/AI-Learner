@@ -1,59 +1,86 @@
-import { AuthSession } from './types';
+import { AuthSession, AuthenticatedUser } from './types';
 import { randomBytes } from 'crypto';
 
-// Session duration: 30 days
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-/**
- * Validates invitation code against environment variable
- */
-export function isValidInvitationCode(code: string): boolean {
-  const validCodes = getInvitationCodes();
-  return validCodes.includes(code.trim().toUpperCase());
+function sanitizeDatabaseKeyPart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
 }
 
-/**
- * Gets invitation codes from environment variable
- */
-export function getInvitationCodes(): string[] {
-  const codesEnv = process.env.INVITATION_CODES || '';
-  return codesEnv
-    .split(',')
-    .map(code => code.trim().toUpperCase())
-    .filter(code => code.length > 0);
+export function deriveDatabaseKey(authUserId: string): string {
+  const sanitized = sanitizeDatabaseKeyPart(authUserId);
+  return sanitized || 'anonymous';
 }
 
-/**
- * Generates a secure session ID
- */
+export function getDatabaseNameForUser(user: Pick<AuthenticatedUser, 'databaseKey'>): string {
+  return `user_${user.databaseKey}`;
+}
+
+export function createAuthenticatedUser(input: {
+  authUserId: string;
+  email?: string | null;
+  displayName?: string | null;
+}): AuthenticatedUser {
+  return {
+    provider: 'agentkea',
+    authUserId: input.authUserId,
+    email: input.email ?? null,
+    displayName: input.displayName ?? null,
+    databaseKey: deriveDatabaseKey(input.authUserId)
+  };
+}
+
 export function generateSessionId(): string {
   return randomBytes(32).toString('hex');
 }
 
-/**
- * Creates a new auth session
- */
-export function createAuthSession(invitationCode: string): AuthSession {
+export function createAuthSession(user: AuthenticatedUser): AuthSession {
   const now = Date.now();
   return {
     id: generateSessionId(),
-    invitationCode: invitationCode.toUpperCase(),
+    user,
     createdAt: now,
     lastActiveAt: now,
     expiresAt: now + SESSION_DURATION_MS
   };
 }
 
-/**
- * Checks if session is expired
- */
+export function getAgentkeaIdentityFromRequest(headers: Headers): AuthenticatedUser | null {
+  const authUserId =
+    headers.get('x-agentkea-user-id') ||
+    process.env.AUTH_AGENTKEA_DEV_USER_ID ||
+    '';
+
+  if (!authUserId) {
+    return null;
+  }
+
+  const email =
+    headers.get('x-agentkea-user-email') ||
+    process.env.AUTH_AGENTKEA_DEV_USER_EMAIL ||
+    null;
+
+  const displayName =
+    headers.get('x-agentkea-user-name') ||
+    process.env.AUTH_AGENTKEA_DEV_USER_NAME ||
+    null;
+
+  return createAuthenticatedUser({
+    authUserId,
+    email,
+    displayName
+  });
+}
+
 export function isSessionExpired(session: AuthSession): boolean {
   return session.expiresAt < Date.now();
 }
 
-/**
- * Checks if session needs activity update (last active > 5 minutes ago)
- */
 export function shouldUpdateActivity(session: AuthSession): boolean {
   const FIVE_MINUTES = 5 * 60 * 1000;
   return Date.now() - session.lastActiveAt > FIVE_MINUTES;

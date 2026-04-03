@@ -46,12 +46,12 @@ export interface ResearchCollection {
   description: string;
   createdAt: number;
   updatedAt: number;
-  pages: string[]; // Array of page IDs
-  rootPageId: string; // The starting page of the collection
+  pages: string[];
+  rootPageId: string;
   tags: string[];
   isPublic: boolean;
-  shareCode?: string; // For sharing collections
-  thumbnail?: string; // Preview image or emoji
+  shareCode?: string;
+  thumbnail?: string;
 }
 
 export type GenerationJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -77,9 +77,17 @@ export interface GenerationJob {
   updatedAt: number;
 }
 
+export interface AuthenticatedUser {
+  provider: 'agentkea';
+  authUserId: string;
+  email?: string | null;
+  displayName?: string | null;
+  databaseKey: string;
+}
+
 export interface AuthSession {
   id: string;
-  invitationCode: string;
+  user: AuthenticatedUser;
   createdAt: number;
   lastActiveAt: number;
   expiresAt: number;
