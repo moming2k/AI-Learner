@@ -880,7 +880,7 @@ function HomeInner() {
                       <span className="hidden sm:inline">Home</span>
                     </button>
                   )}
-                  <DatabaseSelector onDatabaseChange={handleDatabaseChange} />
+                  <DatabaseSelector />
                   <button
                     onClick={() => setShowLibrary(true)}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg

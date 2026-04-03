@@ -2,37 +2,20 @@
 
 import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, GenerationJobType, GenerationJobInput, PageView } from './types';
 
-const DB_STORAGE_KEY = 'selectedDatabase';
-const DB_HEADER_NAME = 'x-database-name';
-
-// Get current database name from localStorage
-function getCurrentDatabase(): string {
-  if (typeof window === 'undefined') return 'default';
-  return localStorage.getItem(DB_STORAGE_KEY) || 'default';
+export function setCurrentDatabase(_dbName: string): void {
+  // Database selection is now derived server-side from the authenticated user.
 }
 
-// Set current database name in localStorage
-export function setCurrentDatabase(dbName: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(DB_STORAGE_KEY, dbName);
-  }
-}
-
-// Get headers with database name
 function getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
   return {
-    [DB_HEADER_NAME]: getCurrentDatabase(),
     ...additionalHeaders
   };
 }
 
 export const storage = {
-  // Wiki Pages
   getPages: async (): Promise<WikiPage[]> => {
     try {
-      const response = await fetch('/api/pages', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/pages', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch pages');
       return await response.json();
     } catch (error) {
@@ -57,9 +40,7 @@ export const storage = {
 
   getPage: async (id: string): Promise<WikiPage | null> => {
     try {
-      const response = await fetch(`/api/pages?id=${id}`, {
-        headers: getHeaders()
-      });
+      const response = await fetch(`/api/pages?id=${id}`, { headers: getHeaders() });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('Failed to fetch page');
       return await response.json();
@@ -71,9 +52,7 @@ export const storage = {
 
   searchPages: async (query: string): Promise<WikiPage[]> => {
     try {
-      const response = await fetch(`/api/pages?query=${encodeURIComponent(query)}`, {
-        headers: getHeaders()
-      });
+      const response = await fetch(`/api/pages?query=${encodeURIComponent(query)}`, { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to search pages');
       return await response.json();
     } catch (error) {
@@ -95,12 +74,9 @@ export const storage = {
     }
   },
 
-  // Learning Sessions
   getSessions: async (): Promise<LearningSession[]> => {
     try {
-      const response = await fetch('/api/sessions', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/sessions', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch sessions');
       return await response.json();
     } catch (error) {
@@ -125,9 +101,7 @@ export const storage = {
 
   getCurrentSession: async (): Promise<LearningSession | null> => {
     try {
-      const response = await fetch('/api/sessions?current=true', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/sessions?current=true', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch current session');
       const data = await response.json();
       return data.session || null;
@@ -137,12 +111,9 @@ export const storage = {
     }
   },
 
-  // Bookmarks
   getBookmarks: async (): Promise<Bookmark[]> => {
     try {
-      const response = await fetch('/api/bookmarks', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/bookmarks', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch bookmarks');
       return await response.json();
     } catch (error) {
@@ -178,12 +149,9 @@ export const storage = {
     }
   },
 
-  // Mindmap
   getMindmap: async (): Promise<KnowledgeNode[]> => {
     try {
-      const response = await fetch('/api/mindmap', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/mindmap', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch mindmap');
       return await response.json();
     } catch (error) {
@@ -194,9 +162,7 @@ export const storage = {
 
   getMindmapNode: async (nodeId: string): Promise<KnowledgeNode | null> => {
     try {
-      const response = await fetch(`/api/mindmap?id=${nodeId}`, {
-        headers: getHeaders()
-      });
+      const response = await fetch(`/api/mindmap?id=${nodeId}`, { headers: getHeaders() });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error('Failed to fetch mindmap node');
       return await response.json();
@@ -221,209 +187,179 @@ export const storage = {
   },
 
   saveMindmapNodes: async (nodes: KnowledgeNode[]): Promise<void> => {
-    try {
-      const response = await fetch('/api/mindmap', {
-        method: 'POST',
-        headers: getHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ nodes })
-      });
-      if (!response.ok) throw new Error('Failed to save mindmap nodes');
-    } catch (error) {
-      console.error('Error saving mindmap nodes:', error);
-      throw error;
+    for (const node of nodes) {
+      await storage.saveMindmapNode(node);
     }
   },
 
-  // Remove duplicate pages based on title
-  removeDuplicatePages: async (): Promise<number> => {
+  deleteMindmapNode: async (id: string): Promise<void> => {
     try {
-      const response = await fetch('/api/pages?action=duplicates', {
+      const response = await fetch(`/api/mindmap?id=${id}`, {
         method: 'DELETE',
         headers: getHeaders()
       });
-      if (!response.ok) throw new Error('Failed to remove duplicates');
-      const data = await response.json();
-      return data.removed || 0;
+      if (!response.ok) throw new Error('Failed to delete mindmap node');
     } catch (error) {
-      console.error('Error removing duplicates:', error);
-      return 0;
-    }
-  },
-
-  // Get duplicate pages info without removing
-  getDuplicateInfo: async () => {
-    try {
-      const pages = await storage.getPages();
-      const titleMap = new Map<string, WikiPage[]>();
-
-      pages.forEach(page => {
-        const normalizedTitle = page.title.toLowerCase().trim();
-        const existing = titleMap.get(normalizedTitle) || [];
-        existing.push(page);
-        titleMap.set(normalizedTitle, existing);
-      });
-
-      const duplicates: Array<{ title: string; count: number; pages: WikiPage[] }> = [];
-
-      titleMap.forEach((pages, title) => {
-        if (pages.length > 1) {
-          duplicates.push({
-            title: pages[0].title,
-            count: pages.length,
-            pages: pages.sort((a, b) => b.createdAt - a.createdAt)
-          });
-        }
-      });
-
-      return {
-        totalPages: pages.length,
-        uniquePages: titleMap.size,
-        duplicatesFound: pages.length - titleMap.size,
-        duplicateGroups: duplicates
-      };
-    } catch (error) {
-      console.error('Error getting duplicate info:', error);
-      return {
-        totalPages: 0,
-        uniquePages: 0,
-        duplicatesFound: 0,
-        duplicateGroups: []
-      };
-    }
-  },
-
-  // Generation Jobs
-  createJob: async (type: GenerationJobType, input: GenerationJobInput): Promise<GenerationJob> => {
-    try {
-      const response = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: getHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ type, input })
-      });
-      if (!response.ok) throw new Error('Failed to create job');
-      return await response.json();
-    } catch (error) {
-      console.error('Error creating job:', error);
+      console.error('Error deleting mindmap node:', error);
       throw error;
     }
+  },
+
+  createJob: async (type: GenerationJobType, input: GenerationJobInput): Promise<GenerationJob> => {
+    const response = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ type, input })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create job' }));
+      throw new Error(error.error || 'Failed to create job');
+    }
+    return response.json();
   },
 
   getJob: async (id: string): Promise<GenerationJob | null> => {
-    try {
-      const response = await fetch(`/api/jobs?id=${id}`, {
-        headers: getHeaders()
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error('Failed to fetch job');
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching job:', error);
-      return null;
+    const response = await fetch(`/api/jobs?id=${id}`, { headers: getHeaders() });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to get job' }));
+      throw new Error(error.error || 'Failed to get job');
     }
+    return response.json();
   },
 
   processJob: async (id: string): Promise<GenerationJob> => {
-    try {
-      const response = await fetch(`/api/jobs/${id}/process`, {
-        method: 'POST',
-        headers: getHeaders()
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process job');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error processing job:', error);
-      throw error;
+    const response = await fetch(`/api/jobs/${id}/process`, {
+      method: 'POST',
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to process job' }));
+      throw new Error(error.error || 'Failed to process job');
+    }
+    return response.json();
+  },
+
+  deleteJob: async (id: string): Promise<void> => {
+    const response = await fetch(`/api/jobs?id=${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to delete job' }));
+      throw new Error(error.error || 'Failed to delete job');
     }
   },
 
   getAllJobs: async (): Promise<GenerationJob[]> => {
-    try {
-      const response = await fetch('/api/jobs', {
-        headers: getHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to fetch jobs');
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      return [];
+    const response = await fetch('/api/jobs', { headers: getHeaders() });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to get jobs' }));
+      throw new Error(error.error || 'Failed to get jobs');
     }
+    return response.json();
   },
 
-  clearAll: async (): Promise<void> => {
+  getViewedPageIds: async (): Promise<Set<string>> => {
     try {
-      const headers = getHeaders();
-      await Promise.all([
-        fetch('/api/pages?action=all', { method: 'DELETE', headers }),
-        fetch('/api/sessions', { method: 'DELETE', headers }),
-        fetch('/api/bookmarks?all=true', { method: 'DELETE', headers }),
-        fetch('/api/mindmap', { method: 'DELETE', headers })
-      ]);
-    } catch (error) {
-      console.error('Error clearing all data:', error);
-      throw error;
-    }
-  },
-
-  // Page Views
-  getPageViews: async (): Promise<PageView[]> => {
-    try {
-      const response = await fetch('/api/page-views', {
-        headers: getHeaders()
-      });
+      const response = await fetch('/api/page-views', { headers: getHeaders() });
       if (!response.ok) throw new Error('Failed to fetch page views');
-      return await response.json();
+      const pageViews: PageView[] = await response.json();
+      return new Set(pageViews.map((pv) => pv.pageId));
     } catch (error) {
       console.error('Error fetching page views:', error);
-      return [];
+      return new Set();
     }
   },
 
-  getPageView: async (pageId: string): Promise<PageView | null> => {
-    try {
-      const response = await fetch(`/api/page-views?pageId=${pageId}`, {
-        headers: getHeaders()
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error('Failed to fetch page view');
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching page view:', error);
-      return null;
-    }
-  },
-
-  getViewedPageIds: async (): Promise<string[]> => {
-    try {
-      const response = await fetch('/api/page-views?idsOnly=true', {
-        headers: getHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to fetch viewed page IDs');
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching viewed page IDs:', error);
-      return [];
-    }
-  },
-
-  recordPageView: async (pageId: string): Promise<boolean> => {
+  markPageAsViewed: async (pageId: string): Promise<void> => {
     try {
       const response = await fetch('/api/page-views', {
         method: 'POST',
         headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ pageId })
       });
-      if (!response.ok) {
-        console.error('Failed to record page view:', response.statusText);
-        return false;
-      }
+      if (!response.ok) throw new Error('Failed to mark page as viewed');
+    } catch (error) {
+      console.error('Error marking page as viewed:', error);
+    }
+  },
+
+  recordPageView: async (pageId: string): Promise<boolean> => {
+    try {
+      await storage.markPageAsViewed(pageId);
       return true;
     } catch (error) {
       console.error('Error recording page view:', error);
-      // Don't throw - we don't want to break navigation if view tracking fails
       return false;
     }
   },
+
+  getUnviewedPagesCount: async (): Promise<number> => {
+    try {
+      const response = await fetch('/api/page-views?unviewed=true', { headers: getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch unviewed count');
+      const data = await response.json();
+      return data.count || 0;
+    } catch (error) {
+      console.error('Error fetching unviewed count:', error);
+      return 0;
+    }
+  },
+
+  getDuplicateInfo: async (): Promise<{ duplicatesFound: number; totalPages: number; uniquePages: number }> => {
+    try {
+      const pages = await storage.getPages();
+      const titleGroups = new Map<string, number>();
+
+      pages.forEach((page) => {
+        const normalizedTitle = page.title.trim().toLowerCase();
+        titleGroups.set(normalizedTitle, (titleGroups.get(normalizedTitle) || 0) + 1);
+      });
+
+      const duplicatesFound = Array.from(titleGroups.values()).reduce((total, count) => {
+        return total + Math.max(0, count - 1);
+      }, 0);
+
+      return {
+        duplicatesFound,
+        totalPages: pages.length,
+        uniquePages: titleGroups.size
+      };
+    } catch (error) {
+      console.error('Error getting duplicate info:', error);
+      return { duplicatesFound: 0, totalPages: 0, uniquePages: 0 };
+    }
+  },
+
+  removeDuplicatePages: async (): Promise<number> => {
+    try {
+      const pages = await storage.getPages();
+      const titleGroups = new Map<string, WikiPage[]>();
+
+      pages.forEach((page) => {
+        const normalizedTitle = page.title.trim().toLowerCase();
+        if (!titleGroups.has(normalizedTitle)) {
+          titleGroups.set(normalizedTitle, []);
+        }
+        titleGroups.get(normalizedTitle)!.push(page);
+      });
+
+      let removedCount = 0;
+      for (const group of titleGroups.values()) {
+        if (group.length > 1) {
+          group.sort((a, b) => b.createdAt - a.createdAt);
+          for (let i = 1; i < group.length; i++) {
+            await storage.deletePage(group[i].id);
+            removedCount++;
+          }
+        }
+      }
+
+      return removedCount;
+    } catch (error) {
+      console.error('Error removing duplicate pages:', error);
+      return 0;
+    }
+  }
 };
