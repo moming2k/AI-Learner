@@ -1,38 +1,31 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 function LoginPageInner() {
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const errorMessage = useMemo(() => {
+    const error = searchParams.get("error");
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        const from = searchParams.get("from") || "/";
-        router.push(from);
-        router.refresh();
-      } else {
-        setError(data.error || "Login failed");
-      }
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    switch (error) {
+      case "missing_callback_token":
+        return "AgentKea sign-in did not return a callback token.";
+      case "verification_failed":
+        return "AgentKea sign-in could not be verified.";
+      case "callback_error":
+        return "Something went wrong while finishing sign-in.";
+      default:
+        return null;
     }
+  }, [searchParams]);
+
+  const handleContinue = () => {
+    const from = searchParams.get("from") || "/";
+    setLoading(true);
+    window.location.href = `/api/auth/login?from=${encodeURIComponent(from)}`;
   };
 
   return (
@@ -45,37 +38,36 @@ function LoginPageInner() {
           <p className="text-gray-600">Sign in with your AgentKea account to continue</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-6">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-900">
-            <p className="font-medium">Version A auth skeleton</p>
+            <p className="font-medium">Personal library sign-in</p>
             <p className="mt-1 text-blue-800">
-              This build creates an app-local session from a server-provided AgentKea identity.
-              Reverse-proxy or callback verification still needs to be wired in.
+              Your AgentKea account now controls which private library database this app uses.
             </p>
           </div>
 
-          {error && (
+          {errorMessage && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
+              {errorMessage}
             </div>
           )}
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleContinue}
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Signing in..." : "Continue with AgentKea Auth"}
+            {loading ? "Redirecting..." : "Continue with AgentKea Auth"}
           </button>
-        </form>
+        </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200 space-y-2 text-sm text-gray-600">
           <p className="text-center">
-            Need access? Sign in via <span className="font-medium text-gray-900">auth.agentkea.com</span>
-            .
+            Need access? Sign in via <span className="font-medium text-gray-900">auth.agentkea.com</span>.
           </p>
           <p className="text-center text-xs text-gray-500">
-            For local development you can set AUTH_AGENTKEA_DEV_USER_ID to mint a temporary app session.
+            For local development you can still set AUTH_AGENTKEA_DEV_USER_ID and call /api/auth/login directly.
           </p>
         </div>
       </div>

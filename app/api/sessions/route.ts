@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbSessions = getDbSessions(dbName);
 
     const searchParams = request.nextUrl.searchParams;
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbSessions = getDbSessions(dbName);
 
     const session: LearningSession = await request.json();
@@ -72,7 +72,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbSessions = getDbSessions(dbName);
 
     dbSessions.deleteAll();

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const body = await request.json();
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const { searchParams } = new URL(request.url);
@@ -85,7 +85,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const { searchParams } = new URL(request.url);

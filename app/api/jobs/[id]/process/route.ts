@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDbJobs, getDbPages } from '@/lib/db';
 import { getDatabaseName } from '@/lib/db-utils';
 import { generateWikiPage, answerQuestion, generateFromSelection } from '@/lib/ai-service';
+import { checkAuth } from '@/lib/auth-guard';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await checkAuth();
+  if (authError) return authError;
+
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
     const dbPages = getDbPages(dbName);
 

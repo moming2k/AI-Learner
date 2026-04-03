@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbPageViews = getDbPageViews(dbName);
 
     const searchParams = request.nextUrl.searchParams;
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbPageViews = getDbPageViews(dbName);
 
     const body = await request.json();
@@ -70,7 +70,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbPageViews = getDbPageViews(dbName);
 
     const searchParams = request.nextUrl.searchParams;

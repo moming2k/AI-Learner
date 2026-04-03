@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const bookmarks = dbBookmarks.getAll();
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const bookmark: Bookmark = await request.json();
@@ -50,7 +50,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = getDatabaseName(request);
+    const dbName = await getDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const searchParams = request.nextUrl.searchParams;
