@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { WikiPage as WikiPageType, LearningSession, Bookmark, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { storage } from '@/lib/storage';
@@ -14,7 +14,7 @@ import Library from '@/components/Library';
 import DatabaseSelector from '@/components/DatabaseSelector';
 import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon, LogOut } from 'lucide-react';
 
-export default function Home() {
+function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState<WikiPageType | null>(null);
@@ -1015,5 +1015,13 @@ export default function Home() {
 
       <Toast toasts={toasts} onRemove={removeToast} />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <HomeInner />
+    </Suspense>
   );
 }

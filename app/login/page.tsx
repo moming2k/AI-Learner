@@ -1,39 +1,38 @@
-'use client';
+"use client";
 
-import { useState, FormEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
-  const [invitationCode, setInvitationCode] = useState('');
-  const [error, setError] = useState('');
+function LoginPageInner() {
+  const [invitationCode, setInvitationCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invitationCode })
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationCode }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Redirect to original destination or home
-        const from = searchParams.get('from') || '/';
+        const from = searchParams.get("from") || "/";
         router.push(from);
         router.refresh();
       } else {
-        setError(data.error || 'Login failed');
+        setError(data.error || "Login failed");
       }
-    } catch (err) {
-      setError('Network error. Please try again.');
+    } catch {
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -80,13 +79,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Verifying...' : 'Access Platform'}
+            {loading ? "Verifying..." : "Access Platform"}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-center text-sm text-gray-600">
-            Don't have an invitation code?{' '}
+            Don&apos;t have an invitation code?{" "}
             <a
               href="mailto:your-email@example.com?subject=AI%20Learner%20Access%20Request"
               className="text-blue-600 hover:text-blue-700 font-medium"
@@ -97,5 +96,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
