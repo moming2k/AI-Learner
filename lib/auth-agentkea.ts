@@ -4,6 +4,7 @@ import { AuthenticatedUser } from './types';
 
 const DEFAULT_AUTH_BASE_URL = 'https://auth.agentkea.com';
 const CALLBACK_TOKEN_PARAM_CANDIDATES = ['token', 'jwt', 'code', 'session'] as const;
+const RETURN_TO_SANITIZE_PARAM_CANDIDATES = [...CALLBACK_TOKEN_PARAM_CANDIDATES, 'error'] as const;
 
 type CallbackTokenParam = (typeof CALLBACK_TOKEN_PARAM_CANDIDATES)[number];
 
@@ -17,6 +18,61 @@ function getAuthBaseUrl(): string {
   return (process.env.AUTH_AGENTKEA_BASE_URL || DEFAULT_AUTH_BASE_URL).replace(/\/$/, '');
 }
 
+function extractCallbackTokenFromSearchParams(searchParams: URLSearchParams): { key: CallbackTokenParam; value: string } | null {
+  for (const key of CALLBACK_TOKEN_PARAM_CANDIDATES) {
+    const value = searchParams.get(key)?.trim();
+    if (value) {
+      return { key, value };
+    }
+  }
+
+  return null;
+}
+
+function extractNestedSearchParams(candidate: string | null | undefined): URLSearchParams | null {
+  if (!candidate) {
+    return null;
+  }
+
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const queryIndex = trimmed.indexOf('?');
+  if (queryIndex === -1 || queryIndex === trimmed.length - 1) {
+    return null;
+  }
+
+  return new URLSearchParams(trimmed.slice(queryIndex + 1));
+}
+
+export function sanitizeReturnTo(returnTo?: string | null): string {
+  if (!returnTo) {
+    return '/';
+  }
+
+  const trimmed = returnTo.trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) {
+    return '/';
+  }
+
+  const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`;
+
+  try {
+    const url = new URL(normalizedPath, 'http://local-app');
+
+    for (const key of RETURN_TO_SANITIZE_PARAM_CANDIDATES) {
+      url.searchParams.delete(key);
+    }
+
+    const sanitized = `${url.pathname}${url.search}${url.hash}`;
+    return sanitized || '/';
+  } catch {
+    return '/';
+  }
+}
+
 export function getAgentkeaLoginUrl(returnTo?: string | null): string {
   const authBaseUrl = getAuthBaseUrl();
   const appBaseUrl = process.env.AUTH_AGENTKEA_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
@@ -26,8 +82,9 @@ export function getAgentkeaLoginUrl(returnTo?: string | null): string {
   }
 
   const callbackUrl = new URL('/api/auth/callback', appBaseUrl);
-  if (returnTo) {
-    callbackUrl.searchParams.set('from', returnTo);
+  const sanitizedReturnTo = sanitizeReturnTo(returnTo);
+  if (sanitizedReturnTo !== '/') {
+    callbackUrl.searchParams.set('from', sanitizedReturnTo);
   }
 
   const loginUrl = new URL('/login', authBaseUrl);
@@ -37,11 +94,14 @@ export function getAgentkeaLoginUrl(returnTo?: string | null): string {
 }
 
 export function extractCallbackToken(request: NextRequest): { key: CallbackTokenParam; value: string } | null {
-  for (const key of CALLBACK_TOKEN_PARAM_CANDIDATES) {
-    const value = request.nextUrl.searchParams.get(key)?.trim();
-    if (value) {
-      return { key, value };
-    }
+  const directToken = extractCallbackTokenFromSearchParams(request.nextUrl.searchParams);
+  if (directToken) {
+    return directToken;
+  }
+
+  const nestedSearchParams = extractNestedSearchParams(request.nextUrl.searchParams.get('from'));
+  if (nestedSearchParams) {
+    return extractCallbackTokenFromSearchParams(nestedSearchParams);
   }
 
   return null;

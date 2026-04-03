@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthSession } from '@/lib/auth';
-import { extractCallbackToken, verifyAgentkeaCallbackToken } from '@/lib/auth-agentkea';
+import { extractCallbackToken, sanitizeReturnTo, verifyAgentkeaCallbackToken } from '@/lib/auth-agentkea';
 import { dbAuthSessions } from '@/lib/db';
 import { sessionCache } from '@/lib/session-cache';
 
 export async function GET(request: NextRequest) {
   try {
     const callbackToken = extractCallbackToken(request);
-    const from = request.nextUrl.searchParams.get('from') || '/';
+    const from = sanitizeReturnTo(request.nextUrl.searchParams.get('from'));
     const loginUrl = new URL('/login', request.nextUrl.origin);
     loginUrl.searchParams.set('from', from);
 
