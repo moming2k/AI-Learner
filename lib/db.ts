@@ -36,6 +36,66 @@ function ensureColumn(db: Database.Database, table: string, column: string, defi
   }
 }
 
+function normalizeAuthSessionsSchema(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(auth_sessions)').all() as Array<{
+    name: string;
+    notnull: number;
+  }>;
+  const invitationCodeColumn = columns.find(column => column.name === 'invitation_code');
+
+  if (!invitationCodeColumn || invitationCodeColumn.notnull === 0) {
+    return;
+  }
+
+  const migrate = db.transaction(() => {
+    db.exec(`
+      ALTER TABLE auth_sessions RENAME TO auth_sessions_legacy;
+
+      CREATE TABLE auth_sessions (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL DEFAULT 'agentkea',
+        auth_user_id TEXT,
+        email TEXT,
+        display_name TEXT,
+        database_key TEXT,
+        created_at INTEGER NOT NULL,
+        last_active_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        invitation_code TEXT
+      );
+
+      INSERT INTO auth_sessions (
+        id,
+        provider,
+        auth_user_id,
+        email,
+        display_name,
+        database_key,
+        created_at,
+        last_active_at,
+        expires_at,
+        invitation_code
+      )
+      SELECT
+        id,
+        COALESCE(NULLIF(provider, ''), 'agentkea'),
+        auth_user_id,
+        email,
+        display_name,
+        database_key,
+        created_at,
+        last_active_at,
+        expires_at,
+        invitation_code
+      FROM auth_sessions_legacy;
+
+      DROP TABLE auth_sessions_legacy;
+    `);
+  });
+
+  migrate();
+}
+
 function initializeDatabase(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS wiki_pages (
@@ -125,6 +185,7 @@ function initializeDatabase(db: Database.Database) {
   ensureColumn(db, 'auth_sessions', 'display_name', 'TEXT');
   ensureColumn(db, 'auth_sessions', 'database_key', 'TEXT');
   ensureColumn(db, 'auth_sessions', 'invitation_code', 'TEXT');
+  normalizeAuthSessionsSchema(db);
 
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(auth_user_id);
