@@ -218,7 +218,7 @@ export default function WikiPage({
       {!isGenerating && (
         <div
           ref={contentRef}
-          className="prose max-w-none overflow-x-hidden break-words sm:prose-lg mb-8"
+          className="prose max-w-none overflow-x-hidden break-words text-gray-700 prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-li:text-gray-700 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-blockquote:text-gray-800 sm:prose-lg mb-8"
           onMouseUp={handleTextSelection}
         >
           <ReactMarkdown
