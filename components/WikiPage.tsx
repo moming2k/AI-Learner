@@ -1,7 +1,7 @@
 'use client';
 
 import { WikiPage as WikiPageType } from '@/lib/types';
-import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle, CheckCircle2, Circle, Sparkles } from 'lucide-react';
+import { BookmarkPlus, BookmarkCheck, ExternalLink, RotateCcw, AlertTriangle, CheckCircle2, Circle, Sparkles, Share2, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useState, useRef } from 'react';
 import SelectionPopup from './SelectionPopup';
@@ -14,6 +14,8 @@ interface WikiPageProps {
   onNavigate: (topic: string) => void | Promise<void | unknown>;
   onBackgroundGenerate?: (topic: string) => void;
   onRegenerate?: () => void | Promise<void>;
+  onShare?: () => void;
+  onNotebookLm?: () => void;
   isLoading?: boolean;
   onGenerateFromSelection?: (selectedText: string, context: string) => void | Promise<void>;
   allPages?: WikiPageType[];
@@ -27,6 +29,8 @@ export default function WikiPage({
   onNavigate,
   onBackgroundGenerate,
   onRegenerate,
+  onShare,
+  onNotebookLm,
   isLoading,
   onGenerateFromSelection,
   allPages = [],
@@ -122,18 +126,42 @@ export default function WikiPage({
         <h1 className="min-w-0 text-2xl font-bold break-words bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent sm:text-3xl lg:text-4xl">
           {page.title}
         </h1>
-        <button
-          onClick={onBookmark}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
-          disabled={page.isPlaceholder}
-        >
-          {isBookmarked ? (
-            <BookmarkCheck className="w-6 h-6 text-blue-600" />
-          ) : (
-            <BookmarkPlus className="w-6 h-6 text-gray-400" />
+        <div className="flex items-center gap-2">
+          {onNotebookLm && (
+            <button
+              onClick={onNotebookLm}
+              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+              title="Send this page to NotebookLM"
+              disabled={page.isPlaceholder}
+            >
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">NotebookLM</span>
+            </button>
           )}
-        </button>
+          {onShare && (
+            <button
+              onClick={onShare}
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+              title="Share this page with a secret link"
+              disabled={page.isPlaceholder}
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
+          <button
+            onClick={onBookmark}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+            disabled={page.isPlaceholder}
+          >
+            {isBookmarked ? (
+              <BookmarkCheck className="w-6 h-6 text-blue-600" />
+            ) : (
+              <BookmarkPlus className="w-6 h-6 text-gray-400" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Generating Status */}

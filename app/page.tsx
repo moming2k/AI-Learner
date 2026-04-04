@@ -12,6 +12,8 @@ import Sidebar from '@/components/Sidebar';
 import Toast, { ToastMessage } from '@/components/Toast';
 import Library from '@/components/Library';
 import DatabaseSelector from '@/components/DatabaseSelector';
+import SharePageModal from '@/components/SharePageModal';
+import NotebookLmModal from '@/components/NotebookLmModal';
 import { BookOpen, Sparkles, Library as LibraryIcon, Home as HomeIcon, LogOut } from 'lucide-react';
 
 function HomeInner() {
@@ -27,6 +29,8 @@ function HomeInner() {
   const [loadingTopics, setLoadingTopics] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showNotebookLmModal, setShowNotebookLmModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -901,6 +905,8 @@ function HomeInner() {
                   onBookmark={handleBookmark}
                   onNavigate={handleTopicSearch}
                   onRegenerate={handleRegenerateCurrentPage}
+                  onShare={() => setShowShareModal(true)}
+                  onNotebookLm={() => setShowNotebookLmModal(true)}
                   isLoading={isLoading}
                   onGenerateFromSelection={handleGenerateFromSelection}
                   allPages={allPages}
@@ -982,6 +988,47 @@ function HomeInner() {
             }
           }}
           viewedPageIds={viewedPageIds}
+        />
+      )}
+
+      {showShareModal && currentPage && (
+        <SharePageModal
+          pageId={currentPage.id}
+          pageTitle={currentPage.title}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
+
+      {showNotebookLmModal && currentPage && (
+        <NotebookLmModal
+          page={currentPage}
+          sessionPageIds={session?.pages || [currentPage.id]}
+          allPages={allPages}
+          onClose={() => setShowNotebookLmModal(false)}
+          onCompleted={async (job) => {
+            const outputPageId = job.output?.id;
+            if (outputPageId) {
+              const savedPage = await storage.getPage(outputPageId);
+              if (savedPage) {
+                await loadAllData(false);
+                navigateToPageWithHistory(savedPage.id, savedPage.title);
+                addToast({
+                  title: 'NotebookLM complete',
+                  message: `Saved “${savedPage.title}” to your library`,
+                  type: 'success',
+                  duration: 5000
+                });
+                return;
+              }
+            }
+
+            addToast({
+              title: 'NotebookLM finished',
+              message: 'The NotebookLM job finished, but the new page could not be opened automatically.',
+              type: 'success',
+              duration: 5000
+            });
+          }}
         />
       )}
 
