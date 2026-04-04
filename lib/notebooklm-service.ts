@@ -12,18 +12,14 @@ type NotebookCreateResponse = {
   id?: string;
   notebook_id?: string;
   title?: string;
+  notebook?: {
+    id?: string;
+    title?: string;
+  };
 };
 
 type NotebookAskResponse = {
   answer?: string;
-};
-
-type NotebookArtifactResponse = {
-  artifact_id?: string;
-  id?: string;
-  task_id?: string;
-  title?: string;
-  status?: string;
 };
 
 function sanitizeTitle(title?: string): string {
@@ -60,14 +56,16 @@ async function runNotebookLmJson<T>(args: string[]): Promise<T> {
 
 async function createNotebook(title: string): Promise<{ id: string; title: string }> {
   const payload = await runNotebookLmJson<NotebookCreateResponse>(['create', title, '--json']);
-  const id = payload.id || payload.notebook_id;
+  const id = payload.id || payload.notebook_id || payload.notebook?.id;
+  const resolvedTitle = payload.title || payload.notebook?.title || title;
+
   if (!id) {
-    throw new Error('NotebookLM did not return a notebook id');
+    throw new Error(`NotebookLM did not return a notebook id: ${JSON.stringify(payload)}`);
   }
 
   return {
     id,
-    title: payload.title || title,
+    title: resolvedTitle,
   };
 }
 
@@ -185,7 +183,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: `${notebookName} (NotebookLM error)` ,
+      title: `${notebookName} (NotebookLM error)`,
       content: buildFallbackContent({
         notebookName,
         prompt,
