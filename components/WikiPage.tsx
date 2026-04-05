@@ -116,10 +116,10 @@ export default function WikiPage({
   };
 
   return (
-    <article className="bg-white rounded-2xl shadow-xl p-8 max-w-4xl mx-auto">
+    <article className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex justify-between items-start mb-6 pb-6 border-b border-gray-200">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+      <div className="mb-6 flex items-start justify-between gap-3 border-b border-gray-200 pb-6">
+        <h1 className="min-w-0 text-2xl font-bold break-words bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent sm:text-3xl lg:text-4xl">
           {page.title}
         </h1>
         <button
@@ -190,27 +190,27 @@ export default function WikiPage({
       {!isGenerating && (
         <div
           ref={contentRef}
-          className="prose prose-lg max-w-none mb-8"
+          className="prose max-w-none overflow-x-hidden break-words sm:prose-lg mb-8"
           onMouseUp={handleTextSelection}
         >
           <ReactMarkdown
           components={{
-            h1: ({ children }) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-2xl font-bold mt-6 mb-3 text-gray-800">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-xl font-semibold mt-4 mb-2 text-gray-700">{children}</h3>,
-            p: ({ children }) => <p className="mb-4 text-gray-700 leading-relaxed">{children}</p>,
-            ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2">{children}</ol>,
-            li: ({ children }) => <li className="text-gray-700">{children}</li>,
+            h1: ({ children }) => <h1 className="mt-8 mb-4 text-2xl font-bold text-gray-900 break-words sm:text-3xl">{children}</h1>,
+            h2: ({ children }) => <h2 className="mt-6 mb-3 text-xl font-bold text-gray-800 break-words sm:text-2xl">{children}</h2>,
+            h3: ({ children }) => <h3 className="mt-4 mb-2 text-lg font-semibold text-gray-700 break-words sm:text-xl">{children}</h3>,
+            p: ({ children }) => <p className="mb-4 text-gray-700 leading-relaxed break-words">{children}</p>,
+            ul: ({ children }) => <ul className="mb-4 list-disc list-inside space-y-2 break-words">{children}</ul>,
+            ol: ({ children }) => <ol className="mb-4 list-decimal list-inside space-y-2 break-words">{children}</ol>,
+            li: ({ children }) => <li className="text-gray-700 break-words">{children}</li>,
             strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
             em: ({ children }) => <em className="italic text-gray-600">{children}</em>,
             code: ({ children }) => (
-              <code className="px-2 py-1 bg-gray-100 rounded text-sm font-mono text-blue-600">
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-mono text-blue-600 break-words whitespace-pre-wrap">
                 {children}
               </code>
             ),
             pre: ({ children }) => (
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
+              <pre className="mb-4 overflow-x-auto rounded-lg bg-gray-900 p-3 text-gray-100 sm:p-4">
                 {children}
               </pre>
             ),
