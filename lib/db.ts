@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, PageView, AuthSession } from './types';
+import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, PageView, AuthSession, ShareLinkRecord } from './types';
 import { getDatabasePath, databaseExists, createDatabase } from './db-manager';
 
 // Cache for database connections
@@ -169,6 +169,15 @@ function initializeDatabase(db: Database.Database) {
       invitation_code TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS share_links (
+      token_hash TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      database_name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      created_by_user_id TEXT,
+      last_accessed_at INTEGER
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_title ON wiki_pages(title);
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON wiki_pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_started ON learning_sessions(started_at DESC);
@@ -177,6 +186,7 @@ function initializeDatabase(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_jobs_created ON generation_jobs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_page_views_last_viewed ON page_views(last_viewed_at DESC);
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_share_links_page ON share_links(database_name, page_id);
   `);
 
   ensureColumn(db, 'auth_sessions', 'provider', "TEXT NOT NULL DEFAULT 'agentkea'");
@@ -680,6 +690,55 @@ export function closeDatabase(dbName?: string) {
     dbConnections.clear();
   }
 }
+
+function rowToShareLink(row: any): ShareLinkRecord {
+  return {
+    tokenHash: row.token_hash,
+    pageId: row.page_id,
+    databaseName: row.database_name,
+    createdAt: row.created_at,
+    createdByUserId: row.created_by_user_id || undefined,
+    lastAccessedAt: row.last_accessed_at || undefined
+  };
+}
+
+export function getDbShareLinks(dbName: string = 'default') {
+  return {
+    getByTokenHash: (tokenHash: string): ShareLinkRecord | null => {
+      const db = getDatabase(dbName);
+      const row = db.prepare('SELECT * FROM share_links WHERE token_hash = ?').get(tokenHash);
+      return row ? rowToShareLink(row) : null;
+    },
+
+    create: (link: ShareLinkRecord) => {
+      const db = getDatabase(dbName);
+      db.prepare(`
+        INSERT OR REPLACE INTO share_links
+        (token_hash, page_id, database_name, created_at, created_by_user_id, last_accessed_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        link.tokenHash,
+        link.pageId,
+        link.databaseName,
+        link.createdAt,
+        link.createdByUserId || null,
+        link.lastAccessedAt || null
+      );
+    },
+
+    deleteByPage: (databaseName: string, pageId: string) => {
+      const db = getDatabase(dbName);
+      db.prepare('DELETE FROM share_links WHERE database_name = ? AND page_id = ?').run(databaseName, pageId);
+    },
+
+    touch: (tokenHash: string, timestamp: number) => {
+      const db = getDatabase(dbName);
+      db.prepare('UPDATE share_links SET last_accessed_at = ? WHERE token_hash = ?').run(timestamp, tokenHash);
+    }
+  };
+}
+
+export const dbShareLinks = getDbShareLinks();
 
 // Backward compatibility: export default database operations
 export const dbPages = getDbPages();

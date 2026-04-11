@@ -1,3 +1,18 @@
+export interface PageSelectionSource {
+  pageId: string;
+  pageTitle: string;
+  selectedText: string;
+  contextExcerpt?: string;
+}
+
+export interface PageSelectionBacklink {
+  targetPageId: string;
+  targetPageTitle: string;
+  selectedText: string;
+  contextExcerpt?: string;
+  createdAt: number;
+}
+
 export interface WikiPage {
   id: string;
   title: string;
@@ -8,6 +23,8 @@ export interface WikiPage {
   parentId?: string;
   isPlaceholder?: boolean;
   mindmapPosition?: { x: number; y: number };
+  sourceSelection?: PageSelectionSource;
+  selectionBacklinks?: PageSelectionBacklink[];
 }
 
 export interface KnowledgeNode {
@@ -55,7 +72,13 @@ export interface ResearchCollection {
 }
 
 export type GenerationJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type GenerationJobType = 'wiki_page' | 'question' | 'selection';
+export type GenerationJobType = 'wiki_page' | 'question' | 'selection' | 'notebooklm_report';
+
+export interface NotebookLmSourceInput {
+  kind: 'url' | 'text';
+  value: string;
+  title?: string;
+}
 
 export interface GenerationJobInput {
   topic?: string;
@@ -64,6 +87,9 @@ export interface GenerationJobInput {
   selectedText?: string;
   context?: string;
   parentId?: string;
+  notebooklmPrompt?: string;
+  notebooklmNotebookName?: string;
+  notebooklmSources?: NotebookLmSourceInput[];
 }
 
 export interface GenerationJob {
@@ -91,4 +117,13 @@ export interface AuthSession {
   createdAt: number;
   lastActiveAt: number;
   expiresAt: number;
+}
+
+export interface ShareLinkRecord {
+  tokenHash: string;
+  pageId: string;
+  databaseName: string;
+  createdAt: number;
+  createdByUserId?: string;
+  lastAccessedAt?: number;
 }
