@@ -3,6 +3,7 @@ import { createAuthSession } from '@/lib/auth';
 import { extractCallbackToken, sanitizeReturnTo, verifyAgentkeaCallbackToken } from '@/lib/auth-agentkea';
 import { dbAuthSessions } from '@/lib/db';
 import { sessionCache } from '@/lib/session-cache';
+import { ensureUserActiveLibrary } from '@/lib/user-library-preferences';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
       loginUrl.searchParams.set('error', 'verification_failed');
       return NextResponse.redirect(loginUrl);
     }
+
+    ensureUserActiveLibrary(user);
 
     const session = createAuthSession(user);
     dbAuthSessions.create(session);

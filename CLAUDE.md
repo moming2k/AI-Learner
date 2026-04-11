@@ -69,6 +69,7 @@ Use `npm run test-openai` to verify API configuration before running the applica
 - **`lib/storage.ts`**: API client layer. Provides async CRUD operations for pages, sessions, bookmarks, mindmap by making fetch calls to API routes. All methods return Promises.
 
 - **`lib/db.ts`**: SQLite database layer. Direct database access using better-sqlite3. Exports `dbPages`, `dbSessions`, `dbBookmarks`, `dbMindmap` objects with synchronous CRUD methods. Only used by API routes.
+- **`lib/user-library-preferences.ts`**: Global app-level user library assignment store. Persists each user's `activeLibraryId`, personal library mapping, and switching state in `data/wiki-app.db`.
 
 - **`lib/types.ts`**: TypeScript interfaces defining WikiPage, KnowledgeNode, LearningSession, Bookmark, ResearchCollection.
 
@@ -184,9 +185,17 @@ System prompts define AI behavior (lib/ai-service.ts):
 - Update JSON structure requirements if changing expected output
 - Test fallback content paths for error handling
 
+## Active Library Notes
+
+- Every authenticated user should have a persisted `activeLibraryId`.
+- On auth callback, the app auto-assigns the user's personal library if missing.
+- Existing users are repaired on read if they still lack a saved library preference.
+- The current selector in `components/DatabaseSelector.tsx` changes only the active library preference. It does **not** migrate notes/pages between databases.
+- Current available-library listing is intentionally minimal: it always includes the user's personal library and is designed to be extended later.
+
 ## Known Quirks
 
-- **Server-Side Storage**: Data persists in SQLite database at `data/wiki.db`. Database file is gitignored.
+- **Server-Side Storage**: User wiki content persists in per-user SQLite databases under `data/wiki-*.db`. Global cross-user library preference metadata persists in `data/wiki-app.db`. Database files are gitignored.
 - **Async Storage**: All storage methods in `lib/storage.ts` are now async and return Promises. Components must use `await` or `.then()`.
 - **Client-Side Only**: All components except API routes must use `'use client'` directive.
 - **ID Uniqueness**: Page IDs include timestamp to ensure uniqueness even for identical topics.
