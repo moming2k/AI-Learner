@@ -688,29 +688,15 @@ function HomeInner() {
 
     setIsLoading(true);
 
-    // Create a temporary loading ID for this selection
-    const loadingId = `loading-${selectedText.toLowerCase().trim()}-${Date.now()}`;
+    const normalizedSelection = selectedText.toLowerCase().trim();
+    const loadingId = `loading-${normalizedSelection}-${Date.now()}`;
     setLoadingPages(prev => new Set(prev).add(loadingId));
 
-    // Create placeholder page immediately
-    const placeholderPage: WikiPageType = {
-      id: loadingId,
-      title: selectedText,
-      content: '# Generating content...\n\nPlease wait while we create this page for you. This usually takes a few seconds.',
-      relatedTopics: [],
-      suggestedQuestions: [],
-      createdAt: Date.now(),
-      isPlaceholder: true,
-      parentId: currentPage.id
-    };
-
-    // Immediately show the placeholder page
-    setCurrentPage(placeholderPage);
-    await updateSession(loadingId, selectedText);
+    const sourcePage = currentPage;
 
     const toastId = addToast({
       title: `Generating "${selectedText}"...`,
-      message: 'Creating contextual content based on your selection',
+      message: 'Creating contextual content in the background from your selection',
       type: 'loading',
       duration: 0
     });
@@ -719,16 +705,15 @@ function HomeInner() {
       // Check if a similar page already exists
       const existingPages = await storage.searchPages(selectedText);
       const similarPage = existingPages.find(
-        p => p.title.toLowerCase() === selectedText.toLowerCase().trim()
+        p => p.title.toLowerCase() === normalizedSelection
       );
 
       if (similarPage && !similarPage.isPlaceholder) {
-        navigateToPageWithHistory(similarPage.id, similarPage.title);
         updateToast(toastId, {
           title: 'Page found',
-          message: `"${similarPage.title}" already exists`,
+          message: `"${similarPage.title}" already exists — staying on this page`,
           type: 'info',
-          duration: 3000
+          duration: 4000
         });
         return;
       }
@@ -736,12 +721,12 @@ function HomeInner() {
       const newPage = await createAndPollJob('selection', {
         selectedText,
         context,
-        parentId: currentPage.id
+        parentId: sourcePage.id
       });
       await storage.savePage(newPage);
 
       // Fetch only the parent node instead of entire mindmap for better performance
-      const parentNode = await storage.getMindmapNode(currentPage.id);
+      const parentNode = await storage.getMindmapNode(sourcePage.id);
       const node = generateMindmapNode(newPage, parentNode || undefined);
 
       // Batch save both nodes in one call for better performance
@@ -762,13 +747,10 @@ function HomeInner() {
 
       updateToast(toastId, {
         title: `"${selectedText}" is ready!`,
-        message: 'Page generated successfully from your selection',
+        message: 'Generated in the background — open it from related links or search when you want',
         type: 'success',
         duration: 5000
       });
-
-      // Navigate to the generated page
-      navigateToPageWithHistory(newPage.id, newPage.title);
     } catch (error) {
       console.error('Error generating from selection:', error);
 
@@ -777,16 +759,6 @@ function HomeInner() {
         message: 'Please try again',
         type: 'error',
         duration: 5000
-      });
-
-      // Update placeholder to show error
-      setCurrentPage(prev => {
-        if (!prev || prev.id !== loadingId) return prev;
-        return {
-          ...prev,
-          content: '# Generation failed\n\nWe encountered an error while generating this page. Please check your API configuration and try again.',
-          isPlaceholder: true
-        };
       });
     } finally {
       setIsLoading(false);
