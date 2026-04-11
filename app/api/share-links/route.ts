@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       token,
-      url: buildShareUrl(token, request.nextUrl.origin),
+      url: buildShareUrl(token),
       page: {
         id: page.id,
         title: page.title,
