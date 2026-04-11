@@ -167,7 +167,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: `${notebookName}`,
+      title: notebookName.toLowerCase().includes('notebooklm') ? notebookName : `${notebookName} via NotebookLM research`,
       content,
       relatedTopics: ['NotebookLM', 'research automation'],
       suggestedQuestions: [
@@ -183,7 +183,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: `${notebookName} (NotebookLM error)`,
+      title: notebookName.toLowerCase().includes('notebooklm') ? `${notebookName} (NotebookLM error)` : `${notebookName} via NotebookLM research (NotebookLM error)`,
       content: buildFallbackContent({
         notebookName,
         prompt,
