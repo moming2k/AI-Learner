@@ -47,11 +47,14 @@ In Railway dashboard:
 
 Add these in Railway dashboard → **Variables**:
 
+> Never commit `.env.local`. Keep runtime secrets only in the deployment environment or on-disk server config outside git.
+
 ```env
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-4o
 OPENAI_API_BASE_URL=https://api.openai.com/v1
+AI_LEARNER_DATA_DIR=/path/to/persistent-data-dir
 
 # Authentication
 AUTH_SECRET=generate-a-random-32-char-string

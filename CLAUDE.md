@@ -211,5 +211,9 @@ Required environment variables:
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
 - `OPENAI_MODEL`: Model name (optional, defaults to 'gpt-5')
 - `OPENAI_API_BASE_URL`: API endpoint (optional, defaults to OpenAI)
+- `AI_LEARNER_DATA_DIR`: Required persistent directory outside the repo for all runtime DB files
 
-The `.env.local` file is gitignored and must be created manually.
+Rules:
+- `.env.local` is runtime-only and must never be committed.
+- Keep `.env.sample` as the only committable env template.
+- Deploy/sync flows must explicitly protect `.env.local` from overwrite or deletion.
