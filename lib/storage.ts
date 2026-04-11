@@ -3,7 +3,7 @@
 import { WikiPage, LearningSession, Bookmark, KnowledgeNode, GenerationJob, GenerationJobType, GenerationJobInput, PageView } from './types';
 
 export function setCurrentDatabase(_dbName: string): void {
-  // Database selection is now derived server-side from the authenticated user.
+  // Database selection is now derived server-side from the authenticated user's active library.
 }
 
 function getHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {

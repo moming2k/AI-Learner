@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbBookmarks } from '@/lib/db';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 import { Bookmark } from '@/lib/types';
 import { checkAuth } from '@/lib/auth-guard';
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const bookmarks = dbBookmarks.getAll();
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const bookmark: Bookmark = await request.json();
@@ -50,7 +50,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbBookmarks = getDbBookmarks(dbName);
 
     const searchParams = request.nextUrl.searchParams;

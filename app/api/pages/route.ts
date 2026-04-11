@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbPages } from '@/lib/db';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 import { WikiPage } from '@/lib/types';
 import { checkAuth } from '@/lib/auth-guard';
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbPages = getDbPages(dbName);
 
     const searchParams = request.nextUrl.searchParams;
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbPages = getDbPages(dbName);
 
     const page: WikiPage = await request.json();
@@ -67,7 +67,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbPages = getDbPages(dbName);
 
     const searchParams = request.nextUrl.searchParams;

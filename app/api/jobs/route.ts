@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbJobs } from '@/lib/db';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 import { GenerationJob, GenerationJobType, GenerationJobInput } from '@/lib/types';
 import { checkAuth } from '@/lib/auth-guard';
 
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const body = await request.json();
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const { searchParams } = new URL(request.url);
@@ -85,7 +85,7 @@ export async function DELETE(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
 
     const { searchParams } = new URL(request.url);

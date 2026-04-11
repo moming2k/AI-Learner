@@ -190,8 +190,10 @@ System prompts define AI behavior (lib/ai-service.ts):
 - Every authenticated user should have a persisted `activeLibraryId`.
 - On auth callback, the app auto-assigns the user's personal library if missing.
 - Existing users are repaired on read if they still lack a saved library preference.
-- The current selector in `components/DatabaseSelector.tsx` changes only the active library preference. It does **not** migrate notes/pages between databases.
-- Current available-library listing is intentionally minimal: it always includes the user's personal library and is designed to be extended later.
+- Library metadata is stored globally in `data/wiki-app.db`.
+- The selector in `components/DatabaseSelector.tsx` can create extra custom libraries for the current user and switch the active library.
+- Once switched, the app's main data APIs resolve against the active library's backing database, so the visible notes/bookmarks/sessions/mindmap are library-specific.
+- Switching libraries is a database-context change, not a page migration.
 
 ## Known Quirks
 

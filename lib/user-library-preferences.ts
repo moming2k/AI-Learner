@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuthenticatedUser } from './types';
+import { createDatabase, databaseExists } from './db-manager';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const APP_DB_PATH = path.join(DATA_DIR, 'wiki-app.db');
@@ -15,7 +16,9 @@ let appDb: Database.Database | null = null;
 export interface LibraryChoice {
   id: string;
   name: string;
-  kind: 'personal';
+  kind: 'personal' | 'custom';
+  databaseName: string;
+  isPersonal: boolean;
 }
 
 export interface UserLibraryPreference {
@@ -43,11 +46,34 @@ function getAppDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS user_libraries (
+      id TEXT PRIMARY KEY,
+      auth_user_id TEXT NOT NULL,
+      database_name TEXT NOT NULL,
+      name TEXT NOT NULL,
+      is_personal INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_libraries_database_name
+      ON user_libraries(database_name);
+    CREATE INDEX IF NOT EXISTS idx_user_libraries_auth_user_id
+      ON user_libraries(auth_user_id);
     CREATE INDEX IF NOT EXISTS idx_user_library_preferences_active_library
       ON user_library_preferences(active_library_id);
   `);
 
   return appDb;
+}
+
+function sanitizeLibrarySlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
 }
 
 function rowToPreference(row: any): UserLibraryPreference {
@@ -62,16 +88,72 @@ function rowToPreference(row: any): UserLibraryPreference {
   };
 }
 
-export function getPersonalLibraryForUser(user: Pick<AuthenticatedUser, 'databaseKey'>): LibraryChoice {
+function rowToLibrary(row: any): LibraryChoice {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.is_personal === 1 ? 'personal' : 'custom',
+    databaseName: row.database_name,
+    isPersonal: row.is_personal === 1,
+  };
+}
+
+export function getPersonalLibraryForUser(user: Pick<AuthenticatedUser, 'databaseKey' | 'authUserId'>): LibraryChoice {
   return {
     id: `personal:${user.databaseKey}`,
     name: 'Personal library',
     kind: 'personal',
+    databaseName: `user_${user.databaseKey}`,
+    isPersonal: true,
   };
 }
 
+function ensureLibraryDatabase(databaseName: string) {
+  if (!databaseExists(databaseName)) {
+    createDatabase(databaseName);
+  }
+}
+
+export function ensurePersonalLibraryRecord(user: AuthenticatedUser): LibraryChoice {
+  const db = getAppDb();
+  const personalLibrary = getPersonalLibraryForUser(user);
+  const now = Date.now();
+
+  ensureLibraryDatabase(personalLibrary.databaseName);
+
+  db.prepare(`
+    INSERT INTO user_libraries (id, auth_user_id, database_name, name, is_personal, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      auth_user_id = excluded.auth_user_id,
+      database_name = excluded.database_name,
+      name = excluded.name,
+      is_personal = 1,
+      updated_at = excluded.updated_at
+  `).run(
+    personalLibrary.id,
+    user.authUserId,
+    personalLibrary.databaseName,
+    personalLibrary.name,
+    now,
+    now
+  );
+
+  return personalLibrary;
+}
+
 export function listAvailableLibrariesForUser(user: AuthenticatedUser): LibraryChoice[] {
-  return [getPersonalLibraryForUser(user)];
+  ensurePersonalLibraryRecord(user);
+  const db = getAppDb();
+  const rows = db
+    .prepare('SELECT * FROM user_libraries WHERE auth_user_id = ? ORDER BY is_personal DESC, updated_at DESC, name ASC')
+    .all(user.authUserId);
+
+  return rows.map(rowToLibrary);
+}
+
+export function getLibraryByIdForUser(user: AuthenticatedUser, libraryId: string): LibraryChoice | null {
+  return listAvailableLibrariesForUser(user).find((library) => library.id === libraryId) || null;
 }
 
 export function getUserLibraryPreference(authUserId: string): UserLibraryPreference | null {
@@ -125,11 +207,11 @@ export function upsertUserLibraryPreference(input: {
 
 export function ensureUserActiveLibrary(user: AuthenticatedUser): UserLibraryPreference {
   const existing = getUserLibraryPreference(user.authUserId);
-  const personalLibrary = getPersonalLibraryForUser(user);
+  const personalLibrary = ensurePersonalLibraryRecord(user);
 
   if (existing?.activeLibraryId) {
-    const needsRepair = !existing.personalLibraryId || !existing.personalLibraryName;
-    if (!needsRepair) {
+    const available = getLibraryByIdForUser(user, existing.activeLibraryId);
+    if (available && existing.personalLibraryId) {
       return existing;
     }
   }
@@ -143,9 +225,41 @@ export function ensureUserActiveLibrary(user: AuthenticatedUser): UserLibraryPre
   });
 }
 
+export function createCustomLibraryForUser(user: AuthenticatedUser, name: string): LibraryChoice {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error('Library name is required.');
+  }
+
+  const db = getAppDb();
+  const now = Date.now();
+  const slug = sanitizeLibrarySlug(trimmed);
+  if (!slug) {
+    throw new Error('Library name is invalid.');
+  }
+
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const id = `library:${user.databaseKey}:${slug}:${suffix}`;
+  const databaseName = `user_${user.databaseKey}_${slug}_${suffix}`;
+
+  ensureLibraryDatabase(databaseName);
+
+  db.prepare(`
+    INSERT INTO user_libraries (id, auth_user_id, database_name, name, is_personal, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 0, ?, ?)
+  `).run(id, user.authUserId, databaseName, trimmed, now, now);
+
+  return {
+    id,
+    name: trimmed,
+    kind: 'custom',
+    databaseName,
+    isPersonal: false,
+  };
+}
+
 export function setUserActiveLibrary(user: AuthenticatedUser, libraryId: string): UserLibraryPreference {
-  const libraries = listAvailableLibrariesForUser(user);
-  const selected = libraries.find((library) => library.id === libraryId);
+  const selected = getLibraryByIdForUser(user, libraryId);
 
   if (!selected) {
     throw new Error('Selected library is not available for this user.');
@@ -159,4 +273,9 @@ export function setUserActiveLibrary(user: AuthenticatedUser, libraryId: string)
     personalLibraryId: ensured.personalLibraryId,
     personalLibraryName: ensured.personalLibraryName,
   });
+}
+
+export function getActiveLibraryForUser(user: AuthenticatedUser): LibraryChoice {
+  const preference = ensureUserActiveLibrary(user);
+  return getLibraryByIdForUser(user, preference.activeLibraryId) || ensurePersonalLibraryRecord(user);
 }

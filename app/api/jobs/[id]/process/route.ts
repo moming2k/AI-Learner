@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbJobs, getDbPages } from '@/lib/db';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 import { generateWikiPage, answerQuestion, generateFromSelection } from '@/lib/ai-service';
 import { checkAuth } from '@/lib/auth-guard';
 
@@ -12,7 +12,7 @@ export async function POST(
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const dbJobs = getDbJobs(dbName);
     const dbPages = getDbPages(dbName);
 

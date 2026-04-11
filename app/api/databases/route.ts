@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseInfo, type DatabaseInfo } from '@/lib/db-manager';
 import { checkAuth } from '@/lib/auth-guard';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 
 export async function GET(request: NextRequest) {
   const authError = await checkAuth();
   if (authError) return authError;
 
   try {
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const info = getDatabaseInfo(dbName);
     const databases: DatabaseInfo[] = info ? [info] : [];
     return NextResponse.json(databases);

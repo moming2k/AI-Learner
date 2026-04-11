@@ -139,9 +139,11 @@ It only changes the selected target library state for future integrations.
 - New authenticated users automatically get a saved `activeLibraryId`.
 - Existing users without one are auto-repaired when seen again.
 - Header shows the resolved active library.
+- User can create an extra library from the UI.
 - User can switch active library from the UI.
 - Selection persists across refresh/login.
-- Existing page storage and page navigation remain unchanged.
+- Main notes data APIs resolve against the selected active library.
+- Switching libraries changes active database context without migrating pages.
 
 ## Non-goals
 
