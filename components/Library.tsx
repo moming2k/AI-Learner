@@ -267,22 +267,14 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                       <Clock className="w-3 h-3" />
                       <span>{formatDate(page.createdAt)}</span>
                     </div>
-                    <div
-                      onClick={(e) => handleDeletePage(page.id, page.title, e)}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-2 rounded-lg
-                               hover:bg-red-100 text-red-600 transition-all cursor-pointer"
-                      title="Delete page"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleDeletePage(page.id, page.title, e as any);
-                        }
-                      }}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeletePage(page.id, page.title, e as any)}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </div>
+                      <span>Delete</span>
+                    </button>
                   </div>
                 );
               })}
@@ -320,22 +312,14 @@ export default function Library({ pages, onPageClick, currentPageId, onClose, on
                       <div className="ml-4 text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(page.createdAt)}
                       </div>
-                      <div
-                        onClick={(e) => handleDeletePage(page.id, page.title, e)}
-                        className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 rounded-lg
-                                 hover:bg-red-100 text-red-600 transition-all cursor-pointer"
-                        title="Delete page"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleDeletePage(page.id, page.title, e as any);
-                          }
-                        }}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeletePage(page.id, page.title, e as any)}
+                        className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </div>
+                        <span>Delete</span>
+                      </button>
                     </div>
                   </div>
                 );

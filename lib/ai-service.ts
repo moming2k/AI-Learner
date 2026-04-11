@@ -13,6 +13,23 @@ const generationCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const CACHE_KEY_DELIMITER = ':';
 
+function getInternalGenerateApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    return '/api/generate';
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.AUTH_AGENTKEA_APP_URL;
+
+  if (!baseUrl) {
+    throw new Error('NEXT_PUBLIC_APP_URL (or NEXT_PUBLIC_BASE_URL / AUTH_AGENTKEA_APP_URL) must be configured for server-side AI requests.');
+  }
+
+  return `${baseUrl.replace(/\/$/, '')}/api/generate`;
+}
+
 function getCacheKey(type: string, key: string): string {
   return `${type}${CACHE_KEY_DELIMITER}${key.toLowerCase().trim()}`;
 }
@@ -69,11 +86,7 @@ export async function generateWikiPage(params: GenerateWikiParams): Promise<Wiki
     : `Create a comprehensive wiki page about "${topic}" with overview, key concepts, details, and applications.`;
 
   try {
-    // Construct absolute URL for server-side fetch
-    const baseUrl = typeof window === 'undefined'
-      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-      : '';
-    const apiUrl = `${baseUrl}/api/generate`;
+    const apiUrl = getInternalGenerateApiUrl();
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -156,11 +169,7 @@ Context: "${context}"
 Explain "${selectedText}" as it relates to "${currentPage.title}".`;
 
   try {
-    // Construct absolute URL for server-side fetch
-    const baseUrl = typeof window === 'undefined'
-      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-      : '';
-    const apiUrl = `${baseUrl}/api/generate`;
+    const apiUrl = getInternalGenerateApiUrl();
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -235,11 +244,7 @@ Question: ${question}
 Answer comprehensively, building on the current topic.`;
 
   try {
-    // Construct absolute URL for server-side fetch
-    const baseUrl = typeof window === 'undefined'
-      ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-      : '';
-    const apiUrl = `${baseUrl}/api/generate`;
+    const apiUrl = getInternalGenerateApiUrl();
 
     const response = await fetch(apiUrl, {
       method: 'POST',
