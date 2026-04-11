@@ -1,15 +1,8 @@
 import Database from 'better-sqlite3';
-import * as fs from 'fs';
-import * as path from 'path';
 import { AuthenticatedUser } from './types';
-import { createDatabase, databaseExists } from './db-manager';
+import { createDatabase, databaseExists, getDatabasePath } from './db-manager';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const APP_DB_PATH = path.join(DATA_DIR, 'wiki-app.db');
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+const APP_DB_PATH = getDatabasePath('app');
 
 let appDb: Database.Database | null = null;
 

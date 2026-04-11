@@ -23,7 +23,7 @@ Rules:
 ## Data model
 
 Add a global app database for cross-user metadata:
-- `data/wiki-app.db`
+- `${AI_LEARNER_DATA_DIR}/wiki-app.db`
 
 Table:
 - `user_library_preferences`
@@ -38,6 +38,7 @@ Table:
 Rationale:
 - Per-user wiki content already lives in per-user DBs.
 - Active library preference is cross-user account metadata, so it should live in one global app DB.
+- All DBs must live in `AI_LEARNER_DATA_DIR` outside the app repo. There is no fallback to `process.cwd()/data`.
 
 ## Library model (v1)
 

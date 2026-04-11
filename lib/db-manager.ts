@@ -2,13 +2,23 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_PREFIX = 'wiki-';
 const DB_EXTENSION = '.db';
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+function requireDataDir(): string {
+  const configured = process.env.AI_LEARNER_DATA_DIR?.trim();
+
+  if (!configured) {
+    throw new Error('AI_LEARNER_DATA_DIR is required and must point to a persistent directory outside the app repo.');
+  }
+
+  const resolved = path.resolve(configured);
+
+  if (!fs.existsSync(resolved)) {
+    fs.mkdirSync(resolved, { recursive: true });
+  }
+
+  return resolved;
 }
 
 // Validate database name to prevent path traversal
@@ -22,16 +32,13 @@ export function getDatabasePath(dbName: string): string {
   if (!validateDatabaseName(dbName)) {
     throw new Error('Invalid database name. Only alphanumeric characters, hyphens, and underscores are allowed.');
   }
-  return path.join(DATA_DIR, `${DB_PREFIX}${dbName}${DB_EXTENSION}`);
+  return path.join(requireDataDir(), `${DB_PREFIX}${dbName}${DB_EXTENSION}`);
 }
 
 // List all available databases
 export function listDatabases(): string[] {
-  if (!fs.existsSync(DATA_DIR)) {
-    return ['default'];
-  }
-
-  const files = fs.readdirSync(DATA_DIR);
+  const dataDir = requireDataDir();
+  const files = fs.readdirSync(dataDir);
   const dbFiles = files.filter(file =>
     file.startsWith(DB_PREFIX) && file.endsWith(DB_EXTENSION)
   );

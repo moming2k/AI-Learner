@@ -149,7 +149,7 @@ Monitor at: https://platform.openai.com/usage
 ## Troubleshooting
 
 ### Database Not Persisting
-Ensure volume is mounted at `/app/data` in Railway settings.
+Set `AI_LEARNER_DATA_DIR` to a persistent directory outside the app repo/worktree. Do not rely on `./data`, because the app intentionally has no fallback and deployments must not touch runtime DB files.
 
 ### Authentication Loop
 1. Check AUTH_SECRET is set

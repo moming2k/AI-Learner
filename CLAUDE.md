@@ -190,14 +190,14 @@ System prompts define AI behavior (lib/ai-service.ts):
 - Every authenticated user should have a persisted `activeLibraryId`.
 - On auth callback, the app auto-assigns the user's personal library if missing.
 - Existing users are repaired on read if they still lack a saved library preference.
-- Library metadata is stored globally in `data/wiki-app.db`.
+- Library metadata is stored globally in `AI_LEARNER_DATA_DIR/wiki-app.db`.
 - The selector in `components/DatabaseSelector.tsx` can create extra custom libraries for the current user and switch the active library.
 - Once switched, the app's main data APIs resolve against the active library's backing database, so the visible notes/bookmarks/sessions/mindmap are library-specific.
 - Switching libraries is a database-context change, not a page migration.
 
 ## Known Quirks
 
-- **Server-Side Storage**: User wiki content persists in per-user SQLite databases under `data/wiki-*.db`. Global cross-user library preference metadata persists in `data/wiki-app.db`. Database files are gitignored.
+- **Server-Side Storage**: User wiki content and library metadata must live under the external directory specified by `AI_LEARNER_DATA_DIR`. There is intentionally no fallback to `./data`. If `AI_LEARNER_DATA_DIR` is missing, the app should fail fast instead of writing inside the repo tree.
 - **Async Storage**: All storage methods in `lib/storage.ts` are now async and return Promises. Components must use `await` or `.then()`.
 - **Client-Side Only**: All components except API routes must use `'use client'` directive.
 - **ID Uniqueness**: Page IDs include timestamp to ensure uniqueness even for identical topics.
