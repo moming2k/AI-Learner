@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUser, unauthorizedResponse } from '@/lib/auth-guard';
-import { getDatabaseName } from '@/lib/db-utils';
+import { getActiveDatabaseName } from '@/lib/database-context';
 import { getDbPages, dbShareLinks } from '@/lib/db';
 import { buildShareUrl, generateShareToken, hashShareToken } from '@/lib/share-links';
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Page ID is required' }, { status: 400 });
     }
 
-    const dbName = await getDatabaseName(request);
+    const dbName = await getActiveDatabaseName(request);
     const page = getDbPages(dbName).getById(pageId);
 
     if (!page) {
