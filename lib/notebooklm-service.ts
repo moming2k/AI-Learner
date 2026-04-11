@@ -22,6 +22,25 @@ type NotebookAskResponse = {
   answer?: string;
 };
 
+function normalizeSummaryTitle(rawTitle: string, fallback: string): string {
+  const trimmed = rawTitle.replace(/^#+\s*/, '').trim().replace(/^"|"$/g, '');
+  const base = trimmed || fallback;
+  const withoutSuffix = base.replace(/\s*[—-]\s*research synthesis\s*$/i, '').trim();
+  return `${withoutSuffix} — research synthesis`;
+}
+
+async function generateSummaryTitle(notebookId: string, reportContent: string, fallbackTitle: string): Promise<string> {
+  const prompt = [
+    'Based on this report, generate a concise summary title for this page.',
+    'Return title only.',
+    '',
+    reportContent,
+  ].join('\n');
+
+  const candidate = await askNotebook(notebookId, prompt);
+  return normalizeSummaryTitle(candidate, fallbackTitle);
+}
+
 function sanitizeTitle(title?: string): string {
   const trimmed = title?.trim();
   return trimmed || 'NotebookLM Report';
@@ -165,9 +184,11 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
       throw new Error('NotebookLM returned an empty response.');
     }
 
+    const finalTitle = await generateSummaryTitle(notebook.id, content, notebookName);
+
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: notebookName.toLowerCase().includes('notebooklm') ? notebookName : `${notebookName} via NotebookLM research`,
+      title: finalTitle,
       content,
       relatedTopics: ['NotebookLM', 'research automation'],
       suggestedQuestions: [
@@ -183,7 +204,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: notebookName.toLowerCase().includes('notebooklm') ? `${notebookName} (NotebookLM error)` : `${notebookName} via NotebookLM research (NotebookLM error)`,
+      title: `${notebookName} — research synthesis (NotebookLM error)`,
       content: buildFallbackContent({
         notebookName,
         prompt,
