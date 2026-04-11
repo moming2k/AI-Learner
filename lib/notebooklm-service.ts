@@ -127,8 +127,16 @@ async function downloadLatestReport(notebookId: string): Promise<string> {
 }
 
 async function askNotebook(notebookId: string, prompt: string): Promise<string> {
-  const payload = await runNotebookLmJson<NotebookAskResponse>(['ask', '--json', '--notebook', notebookId, prompt]);
-  return payload.answer?.trim() || '';
+  const stdout = await runNotebookLm(['ask', '--json', '--notebook', notebookId, prompt]);
+  console.log('[notebooklm] ask raw stdout:', stdout.slice(0, 2000));
+  let payload: NotebookAskResponse | null = null;
+  try {
+    payload = JSON.parse(stdout) as NotebookAskResponse;
+  } catch (error) {
+    console.warn('[notebooklm] ask JSON parse failed:', error);
+  }
+  console.log('[notebooklm] ask parsed payload:', payload);
+  return payload?.answer?.trim() || '';
 }
 
 function buildFallbackContent(options: {
