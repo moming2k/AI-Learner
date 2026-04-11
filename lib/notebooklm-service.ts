@@ -24,21 +24,24 @@ type NotebookAskResponse = {
 
 function normalizeSummaryTitle(rawTitle: string, fallback: string): string {
   const trimmed = rawTitle.replace(/^#+\s*/, '').trim().replace(/^"|"$/g, '');
-  const base = trimmed || fallback;
-  const withoutSuffix = base.replace(/\s*[—-]\s*research synthesis\s*$/i, '').trim();
-  return `${withoutSuffix} — research synthesis`;
+  const withoutNotebookLm = trimmed.replace(/\s+(NotebookLM|via NotebookLM research|NotebookLM synthesis)\s*$/i, '').trim();
+  const withoutSuffix = withoutNotebookLm.replace(/\s*[—-]\s*research synthesis\s*$/i, '').trim();
+  const base = withoutSuffix || fallback;
+  return `${base} — research synthesis`;
 }
 
-async function generateSummaryTitle(notebookId: string, reportContent: string, fallbackTitle: string): Promise<string> {
-  const prompt = [
-    'Based on this report, generate a concise summary title for this page.',
-    'Return title only.',
-    '',
-    reportContent,
-  ].join('\n');
+function extractHeadingTitle(content: string, fallback: string): string {
+  const headingMatch = content.match(/^#\s+(.+)$/m);
+  if (headingMatch?.[1]) {
+    return normalizeSummaryTitle(headingMatch[1], fallback);
+  }
 
-  const candidate = await askNotebook(notebookId, prompt);
-  return normalizeSummaryTitle(candidate, fallbackTitle);
+  const firstMeaningfulLine = content
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('#') && !line.startsWith('>'));
+
+  return normalizeSummaryTitle(firstMeaningfulLine || fallback, fallback);
 }
 
 function sanitizeTitle(title?: string): string {
@@ -48,7 +51,7 @@ function sanitizeTitle(title?: string): string {
 
 function sanitizePrompt(prompt?: string): string {
   const trimmed = prompt?.trim();
-  return trimmed || 'Summarize the provided sources into a concise research report.';
+  return trimmed || 'Produce a concise research synthesis based on the provided sources. Start the output with a single markdown H1 title that captures the overall conclusion. Then write the synthesis below it in markdown. The first line must be a markdown H1 title. Do not include any preamble before the title.';
 }
 
 function uniqueTempPath(prefix: string, suffix: string): string {
@@ -127,16 +130,8 @@ async function downloadLatestReport(notebookId: string): Promise<string> {
 }
 
 async function askNotebook(notebookId: string, prompt: string): Promise<string> {
-  const stdout = await runNotebookLm(['ask', '--json', '--notebook', notebookId, prompt]);
-  console.log('[notebooklm] ask raw stdout:', stdout.slice(0, 2000));
-  let payload: NotebookAskResponse | null = null;
-  try {
-    payload = JSON.parse(stdout) as NotebookAskResponse;
-  } catch (error) {
-    console.warn('[notebooklm] ask JSON parse failed:', error);
-  }
-  console.log('[notebooklm] ask parsed payload:', payload);
-  return payload?.answer?.trim() || '';
+  const payload = await runNotebookLmJson<NotebookAskResponse>(['ask', '--json', '--notebook', notebookId, prompt]);
+  return payload.answer?.trim() || '';
 }
 
 function buildFallbackContent(options: {
@@ -192,7 +187,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
       throw new Error('NotebookLM returned an empty response.');
     }
 
-    const finalTitle = await generateSummaryTitle(notebook.id, content, notebookName);
+    const finalTitle = extractHeadingTitle(content, notebookName);
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -212,7 +207,7 @@ export async function generateNotebookLmReport(options: GenerationJobInput): Pro
 
     return {
       id: `page-notebooklm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: `${notebookName} — research synthesis (NotebookLM error)`,
+      title: normalizeSummaryTitle(notebookName, notebookName) + ' (NotebookLM error)',
       content: buildFallbackContent({
         notebookName,
         prompt,
