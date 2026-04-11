@@ -149,6 +149,24 @@ Monitor at: https://platform.openai.com/usage
 
 ---
 
+## Safe VPS Sync
+
+Use the repo helper script when syncing to a long-lived server checkout:
+
+```bash
+./scripts/deploy-safe.sh openclaw-project@203.161.47.61 /home/openclaw-project/AI-Learner
+```
+
+This script explicitly protects:
+- `.env.local`
+- `*.db`
+- `data/`
+- `.git`
+- `node_modules`
+- `.next`
+
+It is intended to prevent accidental deletion of runtime secrets or SQLite data during deploy syncs.
+
 ## Troubleshooting
 
 ### Database Not Persisting

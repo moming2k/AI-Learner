@@ -217,3 +217,4 @@ Rules:
 - `.env.local` is runtime-only and must never be committed.
 - Keep `.env.sample` as the only committable env template.
 - Deploy/sync flows must explicitly protect `.env.local` from overwrite or deletion.
+- Use `scripts/deploy-safe.sh` (or equivalent exclusions) for VPS syncs so `.env.local`, `*.db`, and `data/` are never touched by deploy rsync.
